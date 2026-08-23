@@ -199,3 +199,89 @@ AI-assisted drafting was used for this post. I reviewed the technical content an
 
 
 #WebGPU #ScientificComputing #ComputationalPhysics #OpenSource
+
+# 2026/08/23
+
+
+
+WebGPU Wave Simulator: Why I’m Pivoting From Weyl to Majorana
+
+
+
+I’ve decided to pivot the wave-simulator project I’ve been documenting from a two-component Weyl formulation to a Majorana formulation.
+
+
+
+Old repo:
+
+https://github.com/benjamincommeau2/weyl-webgpu
+
+
+
+New repo:
+
+https://github.com/benjamincommeau2/majorana-wave-simulator
+
+
+
+Because working through its numerical implementation exposed the reason for the pivot.
+
+
+
+My original plan was attractive for WebGPU: keep only a two-component complex spinor, use an FFT/SLAC-style pseudospectral derivative to avoid lattice fermion doubling, and use a Chebyshev/Jacobi-Anger expansion to fast-forward unitary evolution without Trotterization errors.
+
+
+
+I discovered that the vector potential A create many complications, one of them being requiring an infinite value to create perfect reflections. Introducing a mass term allows reflections as long as the energy of the wave packet is less than the mass of the wave in a specific region of space, hence a spatial dependent mass.
+
+
+
+The complication appears when a mass is introduced through the two-component Majorana equation. The mass term couples the spinor to its complex conjugate, so the equation is real-linear rather than complex-linear. In order to invoke charge conjugation, one must take arbitrary unitaries and decompose them into charge conjugation operations which becomes a hassel at an algorithm level.
+
+
+
+A two-component complex spinor already contains four real numbers. In a Majorana representation, those same four numbers can be treated directly as a real four-component spinor. The time-evolution generator can then be represented as a real anti-Hermitian generator, giving norm-preserving orthogonal evolution on the real state space without adding physical degrees of freedom.
+
+
+
+For the spatial transform I’m exploring the real structure
+
+
+
+J = iγ⁵,   J² = -1,
+
+
+
+where γ⁵ = i γ⁰ γ¹ γ² γ³ is the Dirac chirality matrix, J = i Y ⊗ I can be written as a real anti-symmetric rotation matrix, and with a Fourier kernel
+
+
+
+exp(Jθ) = cos(θ) + J sin(θ).
+
+
+
+I’m calling this the J-DFT for now. Computationally, it can still map onto cache-friendly i-DFT machinery by pairing the four real components into two complex storage channels. That is only an encoding of the real Majorana state, no charge-conjugate copy needs to be stored.
+
+
+
+There is also a useful algebraic split: the kinetic α matrices commute with J, while the mass matrix β anticommutes with J.
+
+
+
+That distinction is becoming the architecture of the new simulator.
+
+
+
+The larger goal has not changed: build the wave/scattering foundation carefully enough that every numerical shortcut can be tested before I connect it to the larger D-CTC and Smith-chart-style experiments.
+
+
+
+This pivot is exactly why I’m developing in small checkpoints: when the mathematics says the data representation should change, change it before optimizing the wrong model.
+
+
+
+AI-assisted.
+
+
+
+#WebGPU #ScientificComputing #ComputationalPhysics #OpenSource
