@@ -143,7 +143,7 @@ The gamma matrices satisfy
 with metric convention
 
 ```math
-\eta=\operatorname{diag}(+1,-1,-1,-1).
+\eta=\mathrm{diag}(+1,-1,-1,-1).
 ```
 
 Define
