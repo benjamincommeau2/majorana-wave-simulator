@@ -202,7 +202,7 @@ AI-assisted drafting was used for this post. I reviewed the technical content an
 
 # 2026/08/23
 
-
+https://www.linkedin.com/feed/update/urn:li:share:7497306113344839680/
 
 WebGPU Wave Simulator: Why I’m Pivoting From Weyl to Majorana
 
