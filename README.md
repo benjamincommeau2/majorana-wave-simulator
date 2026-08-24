@@ -40,34 +40,260 @@ The project is intentionally developed in small, testable checkpoints so that ea
 
 # Installation and Local Development
 
-This project runs in the browser using Rust compiled to WebAssembly, with `wgpu` providing the Rust-side WebGPU interface.
+This project runs in the browser using Rust compiled to WebAssembly, with `wgpu` providing the Rust-side interface to browser WebGPU.
 
-## Prerequisites
+The active development stack is:
 
-Before running the project, install:
+```text
+Rust source code
+      ↓
+Cargo
+      ↓
+wasm32-unknown-unknown
+      ↓
+Trunk
+      ↓
+WebAssembly
+      ↓
+wgpu
+      ↓
+browser WebGPU
+      ↓
+GPU
+```
 
-* a recent version of Rust using `rustup`,
-* Cargo, which is installed with Rust,
-* the Rust WebAssembly target,
-* Trunk,
-* and a Chromium-based browser with WebGPU support, such as Chrome or Edge.
+## 1. Install Git
 
-On Windows, Rust may also require the Microsoft C++ Build Tools and Windows SDK.
+Git is used to download the repository and manage source-code history.
 
-## Verify Rust
+Official download:
 
-Open a terminal and confirm that Rust and Cargo are available:
+https://git-scm.com/downloads
+
+After installation, open PowerShell and verify:
+
+```powershell
+git --version
+```
+
+A successful installation should print a Git version number.
+
+---
+
+## 2. Install Rust
+
+Install Rust through the official `rustup` installer:
+
+https://www.rust-lang.org/tools/install
+
+On Windows, download and run `rustup-init.exe`.
+
+When prompted, the default Rust installation is appropriate for this project.
+
+After installation, completely restart the terminal or restart Visual Studio Code so the updated system `PATH` is detected.
+
+Verify Rust:
 
 ```powershell
 rustc --version
+```
+
+Verify Cargo:
+
+```powershell
 cargo --version
 ```
 
 Both commands should print installed version numbers.
 
-## Install the WebAssembly Target
+### Windows Build Tools
 
-Add the browser WebAssembly compilation target:
+Rust on Windows may require the Microsoft Visual C++ Build Tools and Windows SDK.
+
+If the Rust installer requests them, install the Visual Studio Build Tools from:
+
+https://visualstudio.microsoft.com/visual-cpp-build-tools/
+
+The important components are:
+
+```text
+MSVC C++ x64/x86 build tools
+Windows SDK
+```
+
+The Visual Studio workload commonly associated with these components is:
+
+```text
+Desktop development with C++
+```
+
+---
+
+## 3. Install Visual Studio Code
+
+Visual Studio Code is the editor currently used for development.
+
+Official download:
+
+https://code.visualstudio.com/
+
+VS Code is not required to compile the project, but the development instructions in this repository assume it is being used.
+
+---
+
+## 4. Install a WebGPU-Capable Browser
+
+Use a recent Chromium-based browser with WebGPU support.
+
+Recommended options include:
+
+* Google Chrome: https://www.google.com/chrome/
+* Microsoft Edge: https://www.microsoft.com/edge
+
+The simulator depends on browser WebGPU support.
+
+---
+
+## 5. Clone the Repository
+
+Open PowerShell in the directory where you want the project to be stored.
+
+For example:
+
+```powershell
+cd C:\Users\YOUR_USERNAME\Documents
+```
+
+Clone the repository:
+
+```powershell
+git clone https://github.com/benjamincommeau2/majorana-wave-simulator.git
+```
+
+Enter the project directory:
+
+```powershell
+cd majorana-wave-simulator
+```
+
+The repository root should contain files similar to:
+
+```text
+majorana-wave-simulator/
+├── src/
+│   └── lib.rs
+├── .gitignore
+├── Cargo.lock
+├── Cargo.toml
+├── index.html
+├── LICENSE
+├── LinkedIn.md
+└── README.md
+```
+
+---
+
+## 6. Open the Project in Visual Studio Code
+
+From the repository root, run:
+
+```powershell
+code .
+```
+
+The period means:
+
+```text
+open the current directory
+```
+
+If the `code` command is unavailable, open Visual Studio Code manually and use:
+
+```text
+File
+  ↓
+Open Folder
+  ↓
+majorana-wave-simulator
+```
+
+---
+
+## 7. Understand the Source Directory
+
+The main Rust source code currently lives in:
+
+```text
+src/lib.rs
+```
+
+The important project files are:
+
+```text
+Cargo.toml
+```
+
+Defines the Rust package, build type, and dependencies.
+
+```text
+Cargo.lock
+```
+
+Records the exact dependency versions selected by Cargo.
+
+```text
+src/lib.rs
+```
+
+Contains the Rust application code compiled into WebAssembly.
+
+```text
+index.html
+```
+
+Contains the browser page loaded by Trunk.
+
+```text
+.gitignore
+```
+
+Prevents generated build output from being committed to Git.
+
+The `src` directory contains source code, but build commands should normally be run from the **repository root**, not from inside `src`.
+
+For example, this is correct:
+
+```text
+majorana-wave-simulator/
+    ↑
+run trunk here
+```
+
+This is not the intended working directory:
+
+```text
+majorana-wave-simulator/src/
+                           ↑
+                    do not run Trunk here
+```
+
+If you enter the source directory while inspecting files:
+
+```powershell
+cd src
+```
+
+you can return to the repository root with:
+
+```powershell
+cd ..
+```
+
+---
+
+## 8. Install the Rust WebAssembly Target
+
+From the repository root, install Rust's browser WebAssembly compilation target:
 
 ```powershell
 rustup target add wasm32-unknown-unknown
@@ -75,9 +301,21 @@ rustup target add wasm32-unknown-unknown
 
 If it is already installed, `rustup` will report that the component is up to date.
 
-## Install Trunk
+This target allows Rust source code to be compiled into `.wasm` files that can execute in the browser.
 
-Trunk builds the Rust project into WebAssembly and serves the browser application locally.
+---
+
+## 9. Install Trunk
+
+Trunk builds the Rust application into WebAssembly and serves the resulting browser application.
+
+Project website:
+
+https://trunkrs.dev/
+
+GitHub repository:
+
+https://github.com/trunk-rs/trunk
 
 Install the version currently used by this project:
 
@@ -85,21 +323,56 @@ Install the version currently used by this project:
 cargo install trunk --locked --version 0.21.14
 ```
 
+The first installation may take several minutes because Cargo compiles Trunk and its dependencies.
+
 Verify the installation:
 
 ```powershell
 trunk --version
 ```
 
-The expected version for the current development environment is:
+The current project setup expects:
 
 ```text
 trunk 0.21.14
 ```
 
-## Run the Simulator
+---
 
-From the repository root, where `Cargo.toml` and `index.html` are located, run:
+## 10. Build the Project
+
+From the repository root:
+
+```powershell
+trunk build
+```
+
+This performs the basic build pipeline:
+
+```text
+Cargo.toml
+    ↓
+src/lib.rs
+    ↓
+Rust compiler
+    ↓
+WebAssembly
+    ↓
+Trunk browser output
+```
+
+A successful build should end with output similar to:
+
+```text
+Finished ...
+INFO success
+```
+
+---
+
+## 11. Run the Simulator
+
+From the repository root, run:
 
 ```powershell
 trunk serve --open
@@ -116,22 +389,32 @@ target WebAssembly
         ↓
 generate browser assets
         ↓
-start a local development server
+start a local web server
         ↓
 open the simulator in the browser
 ```
 
-The local development page will normally be available at:
+The development page will normally be available at:
 
 ```text
 http://127.0.0.1:8080/
 ```
 
-or an equivalent localhost address reported by Trunk.
+Trunk may also report equivalent localhost addresses.
 
-## Expected First Checkpoint
+Keep the terminal running while using the development server.
 
-A working browser build should currently display:
+To stop the server, press:
+
+```text
+Ctrl + C
+```
+
+---
+
+## 12. Expected Current Checkpoint
+
+At the current development checkpoint, a successful browser run should display:
 
 ```text
 Majorana WebGPU Wave Simulator
@@ -139,52 +422,160 @@ Majorana WebGPU Wave Simulator
 WebGPU adapter acquired successfully.
 ```
 
-This confirms that:
+This confirms that the following path is working:
 
 ```text
 Rust
     ↓
 WebAssembly
     ↓
-wgpu
+wgpu::Instance
     ↓
 browser WebGPU
     ↓
-compatible GPU adapter
+wgpu::Adapter
+    ↓
+compatible GPU adapter acquired
 ```
 
-is working successfully.
+The project has not yet completed GPU-device creation, GPU-buffer allocation, state upload, or GPU readback.
 
-## Generated Build Files
+---
 
-Running Cargo and Trunk creates local generated directories:
+## 13. Generated Build Files
+
+Cargo and Trunk generate local build directories:
 
 ```text
 target/
 dist/
 ```
 
-These directories are intentionally excluded from the repository through `.gitignore`.
+These directories are intentionally excluded from Git through `.gitignore`.
 
-`target/` contains Rust compilation outputs, dependency builds, caches, and WebAssembly intermediates.
+`target/` contains:
 
-`dist/` contains the browser files generated by Trunk.
+* compiled Rust dependencies,
+* intermediate compiler output,
+* WebAssembly build intermediates,
+* debugging information,
+* Cargo build caches.
 
-They can be regenerated and should not be committed.
+`dist/` contains:
 
-`Cargo.lock`, however, is intentionally retained in the repository because it records the exact dependency versions used by the application.
+* generated browser files,
+* compiled WebAssembly output,
+* generated JavaScript/WASM loader glue,
+* processed HTML assets.
 
-## Live Server Note
+Both directories can be regenerated and should not be committed.
 
-The earlier JavaScript prototype could be served directly with the VS Code Live Server / Go Live extension.
+The repository currently ignores them with:
 
-The active Rust/WebAssembly implementation should instead be run with:
+```gitignore
+/target/
+/dist/
+```
+
+Before adding any future build tool, asset pipeline, profiler, benchmark system, or generated-data workflow, its output directories should be identified and added to `.gitignore` before they are committed.
+
+### Cargo.lock Is Intentionally Tracked
+
+Do **not** add `Cargo.lock` to `.gitignore`.
+
+`Cargo.lock` records the exact dependency versions selected by Cargo and is intentionally kept in the repository so application builds are reproducible.
+
+---
+
+## 14. Basic Git Workflow
+
+Before making changes, inspect the repository state:
+
+```powershell
+git status
+```
+
+After editing a specific file, stage only that file when appropriate:
+
+```powershell
+git add README.md
+```
+
+or:
+
+```powershell
+git add src/lib.rs
+```
+
+Check what is staged:
+
+```powershell
+git status
+```
+
+Create a commit:
+
+```powershell
+git commit -m "describe the completed checkpoint"
+```
+
+Push committed work to the current remote branch:
+
+```powershell
+git push
+```
+
+Avoid automatically staging every generated or modified file without first checking:
+
+```powershell
+git status
+```
+
+In particular, generated directories such as `target/` and `dist/` should never appear among files being committed.
+
+---
+
+## 15. Live Server / Go Live Note
+
+The earlier JavaScript prototype could be served directly through the VS Code Live Server / Go Live extension.
+
+The active Rust/WebAssembly project should instead be run with:
 
 ```powershell
 trunk serve --open
 ```
 
-Live Server by itself does not compile Rust into WebAssembly.
+Live Server alone cannot compile:
+
+```text
+src/lib.rs
+```
+
+into WebAssembly.
+
+The current browser-development path is therefore:
+
+```text
+index.html
+      ↓
+Trunk
+      ↓
+Cargo / Rust
+      ↓
+WebAssembly
+      ↓
+browser
+```
+
+rather than the previous JavaScript path:
+
+```text
+index.html
+      ↓
+main.js
+      ↓
+browser
+```
 
 
 
