@@ -1,63 +1,12 @@
-// Import useful tools from the wasm-bindgen library.
-// wasm-bindgen lets Rust communicate with JavaScript/browser APIs.
-use wasm_bindgen::prelude::*;
+use wasm_bindgen::prelude::*; // Imports the common wasm-bindgen tools we need to connect Rust with WebAssembly.
 
+#[wasm_bindgen(start)] // Tells wasm-bindgen to run the next function automatically when the WebAssembly module starts.
 
-// This attribute tells wasm-bindgen:
-// "Run the function below automatically when the WebAssembly module starts."
-#[wasm_bindgen(start)]
-
-// Define a public function named "start".
-// Result<(), JsValue> means:
-// - Ok(()) if everything succeeds
-// - Err(JsValue) if a browser/JavaScript-related error occurs
-pub fn start() -> Result<(), JsValue> {
-
-    // Install a better panic handler.
-    // If our Rust program crashes later, the browser console will show
-    // a much more useful Rust error message.
-    console_error_panic_hook::set_once();
-
-
-    // Ask the browser for its Window object.
-    // The Window represents the browser window/tab containing our webpage.
-    let window = web_sys::window()
-
-        // If there is somehow no browser Window, stop the program
-        // and display this error message.
-        .expect("Could not get browser window");
-
-
-    // Ask the Window object for the HTML Document.
-    // The Document represents our index.html page.
-    let document = window
-
-        // Get the document associated with this browser window.
-        .document()
-
-        // Stop with an error message if no document exists.
-        .expect("Could not get document");
-
-
-    // Search the HTML document for an element whose id is "status".
-    // Later, index.html will contain something like:
-    // <pre id="status">...</pre>
-    let status = document
-
-        // Perform the actual search for id="status".
-        .get_element_by_id("status")
-
-        // Stop with an error if that HTML element cannot be found.
-        .expect("Could not find element with id=status");
-
-
-    // Replace the text inside the HTML element we found.
-    // If this appears in the browser, we know Rust/WASM started successfully.
-    status.set_text_content(Some("Rust/WASM loaded successfully."));
-
-
-    // Tell Rust that the function completed successfully.
-    Ok(())
-
-// Close the start function.
-}
+pub fn start() -> Result<(), JsValue> { // Defines the startup function and says it can either succeed or return a JavaScript-compatible error.
+  console_error_panic_hook::set_once(); // Installs a panic hook so Rust errors are easier to read in the browser console.
+  let window = web_sys::window().expect("Could not get browser window"); // Gets the browser's Window object and stops with this message if it is unavailable.
+  let document = window.document().expect("Could not get document"); // Gets the HTML document loaded inside the browser window and stops if it is unavailable.
+  let status = document.get_element_by_id("status").expect("Could not find element with id=status"); // Finds the HTML element whose id is "status" and stops if that element does not exist.
+  status.set_text_content(Some("Rust/WASM loaded successfully.")); // Replaces the text inside the HTML status element with a success message.
+  Ok(()) // Tells Rust that the startup function finished successfully and did not return an error.
+  } // Closes the body of the start function.
