@@ -1,16 +1,41 @@
+# This section describes the Rust package/project itself.
 [package]
+
+# This is the name Cargo uses for our project.
 name = "majorana-wave-simulator"
+
+# This is the current version number of our project.
 version = "0.1.0"
+
+# This tells Rust which language edition/syntax rules we are using.
 edition = "2024"
 
+
+# This section describes the Rust library that we are building.
 [lib]
+
+# "cdylib" tells Rust to build a library that can be turned into WebAssembly.
 crate-type = ["cdylib"]
 
+
+# This section lists external Rust libraries our project needs.
 [dependencies]
+
+# wasm-bindgen creates the bridge between Rust/WebAssembly and the browser.
 wasm-bindgen = "0.2"
+
+# web-sys gives Rust access to browser APIs such as Window and Document.
 web-sys = { version = "0.3", features = [
+
+    # Gives Rust access to the browser's HTML Document object.
     "Document",
+
+    # Gives Rust access to HTML elements found inside the document.
     "Element",
+
+    # Gives Rust access to the browser Window object.
     "Window",
 ] }
+
+# This makes Rust panic/error messages easier to read in the browser console.
 console_error_panic_hook = "0.1"
