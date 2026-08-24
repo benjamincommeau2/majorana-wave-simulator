@@ -1,3 +1,14 @@
+# This file is the Cargo manifest for the Majorana Wave Simulator.
+#
+# Its responsibilities include:
+# - Defining the Rust package name, version, and language edition.
+# - Telling Cargo what kind of library to build.
+# - Listing the external crates used by the project.
+# - Configuring dependencies needed for WebAssembly, browser APIs, and WebGPU.
+#
+# Cargo reads this file when building, testing, or running project-related commands.
+# The generated build output goes into /target/, which is ignored by Git.
+
 [package] # Starts the section that describes our Rust project.
 
 name = "majorana-wave-simulator" # Gives this Rust project its Cargo package name.
@@ -9,7 +20,7 @@ edition = "2024" # Tells Rust which language edition and syntax rules this proje
 
 [lib] # Starts the section that describes the Rust library we want Cargo to build.
 
-crate-type = ["cdylib"] # Tells Rust to build a C-compatible dynamic library that can be turned into WebAssembly.
+crate-type = ["cdylib", "rlib"] # Builds WebAssembly-compatible output with `cdylib` and a normal Rust library with `rlib` so integration tests can import this crate.
 
 [dependencies] # Starts the section where we list external Rust libraries this project uses.
 
@@ -22,3 +33,5 @@ web-sys = { version = "0.3", features = ["Document", "Element", "Window"] } # Gi
 wgpu = "30.0" # Adds wgpu, the Rust graphics library that can use browser WebGPU when compiled to WebAssembly.
 
 wasm-bindgen-futures = "0.4" # Lets our browser-based Rust code wait for asynchronous operations such as requesting a GPU adapter.
+
+bytemuck = "1" # Adds safe helpers for viewing our typed f32 state as raw bytes when transferring it to WebGPU.

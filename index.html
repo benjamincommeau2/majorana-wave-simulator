@@ -1,3 +1,15 @@
+<!--
+This file is the browser entry point for the Majorana Wave Simulator.
+
+Its responsibilities include:
+- Defining the basic webpage structure.
+- Providing HTML elements that Rust can access and update.
+- Telling Trunk to compile and load the Rust/WebAssembly application.
+- Acting as the browser shell around the Rust/WebGPU simulator.
+
+The simulation logic itself belongs in Rust rather than in this HTML file.
+-->
+
 <!doctype html> <!-- Tells the browser that this file uses modern HTML5. -->
 <html lang="en"> <!-- Starts the HTML document and tells the browser that the page language is English. -->
   <head> <!-- Starts the head section, which stores page information that is not part of the main visible content. -->
