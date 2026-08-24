@@ -31,5 +31,11 @@ impl MajoranaState { // Starts an implementation block where we define functions
 
     } // Closes the `len` method.
 
+    pub fn components(&self) -> &[f32; 4] { // Defines a public method that borrows the Majorana state and returns a read-only reference to its four stored components.
+
+      &self.components // Returns a borrowed reference to the internal four-component array without copying or transferring ownership.
+
+      } // Closes the `components` method.
+
   } // Closes the `impl MajoranaState` block that contains methods belonging to `MajoranaState`.
 

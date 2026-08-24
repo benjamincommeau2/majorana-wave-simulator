@@ -30,3 +30,13 @@ fn majorana_state_has_four_components() { // Defines a test function whose name 
   assert_eq!(majorana_state.len(), 4); // Passes only if the new Majorana state reports exactly four components.
 
   } // Closes the `majorana_state_has_four_components` test function.
+
+#[test] // Tells Rust that the next function will be our second automated test case.
+
+fn new_majorana_state_has_expected_components() { // Defines a test for the exact four-component values of a newly created Majorana state.
+
+  let majorana_state = state::MajoranaState::new(); // Creates a fresh Majorana state so this test can verify its initial component values.
+
+  assert_eq!(majorana_state.components(), &[1.0, 0.0, 0.0, 0.0]); // Passes only if the new Majorana state exposes exactly the expected four initial component values.
+
+  } // Closes the `new_majorana_state_has_expected_components` test function.
