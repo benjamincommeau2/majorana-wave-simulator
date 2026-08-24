@@ -1,0 +1,4 @@
+# Ignores Cargo's generated compilation and build-cache directory.
+/target/
+# Ignores Trunk's generated website output directory.
+/dist/
