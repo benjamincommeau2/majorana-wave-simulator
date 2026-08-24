@@ -45,11 +45,22 @@ pub fn start() -> Result<(), JsValue> { // Defines the startup function and says
 
     status.set_text_content(Some("WebGPU device and queue created successfully.")); // Updates the page only after Rust successfully creates the GPU device and command queue.
 
-    let majorana_state: [f32; 4] = [1.0, 0.0, 0.0, 0.0]; // Creates our first real four-component Majorana spinor in CPU memory using four 32-bit floating-point values.
+    let majorana_state = state::MajoranaState::new(); // Creates the initial four-component state through our tested production `MajoranaState` API instead of duplicating the raw array here.
 
-    let state_buffer = device.create_buffer(&wgpu::BufferDescriptor { label: Some("Majorana State Buffer"), size: std::mem::size_of_val(&majorana_state) as wgpu::BufferAddress, usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::COPY_SRC, mapped_at_creation: false }); // Allocates a GPU buffer exactly large enough for the four-f32 Majorana state and allows storage use, CPU-to-GPU copies, and later GPU-to-CPU copies.
+    let majorana_components = majorana_state.components(); // Borrows the tested four-f32 component array so the WebGPU code can upload the same state representation.
 
-    queue.write_buffer(&state_buffer, 0, bytemuck::cast_slice(&majorana_state)); // Copies the four-f32 Majorana state from CPU memory into the GPU buffer, starting at byte offset 0.
+    let state_buffer = device.create_buffer(
+      &wgpu::BufferDescriptor { 
+        
+        label: Some("Majorana State Buffer"), // Gives the GPU buffer a readable debugging label.
+
+        size: std::mem::size_of_val(majorana_components) as wgpu::BufferAddress, // Sizes the GPU buffer from the tested four-f32 component array, which currently occupies exactly 16 bytes.
+
+        usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::COPY_SRC, mapped_at_creation: false // Allows shader storage access, CPU-to-GPU writes, GPU copies, and leaves the buffer initially unmapped.
+
+    }); // Allocates a GPU buffer exactly large enough for the four-f32 Majorana state and allows storage use, CPU-to-GPU copies, and later GPU-to-CPU copies.
+
+    queue.write_buffer(&state_buffer, 0, bytemuck::cast_slice(majorana_components)); // Converts the tested f32 components into bytes and uploads those exact bytes into the GPU buffer.
 
     status.set_text_content(Some("Majorana state uploaded to GPU successfully.")); // Updates the webpage only after the four-component CPU state has been written into the GPU buffer.
     
