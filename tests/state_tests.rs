@@ -40,3 +40,13 @@ fn new_majorana_state_has_expected_components() { // Defines a test for the exac
   assert_eq!(majorana_state.components(), &[1.0, 0.0, 0.0, 0.0]); // Passes only if the new Majorana state exposes exactly the expected four initial component values.
 
   } // Closes the `new_majorana_state_has_expected_components` test function.
+
+#[test] // Tells Rust that the next function is an automated test for the Majorana state's memory size.
+
+fn majorana_state_occupies_sixteen_bytes() { // Defines a test that verifies the CPU-side Majorana state occupies exactly 16 bytes in memory.
+
+  assert_eq!(std::mem::size_of::<state::MajoranaState>(), 16); // Passes only if the complete `MajoranaState` type occupies exactly sixteen bytes.
+
+  } // Closes the `majorana_state_occupies_sixteen_bytes` test function.
+
+  // This is a regression/characterization test because the current `[f32; 4]` implementation may already satisfy the 16-byte requirement.
