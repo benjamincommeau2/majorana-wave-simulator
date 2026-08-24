@@ -1,3 +1,80 @@
+# 2026/08/24
+
+https://lnkd.in/p/e8yR5QFb
+
+Majorana WebGPU Simulator: Moving the Browser Stack From JavaScript to Rust
+
+Since my last update, I’ve started migrating the host side of my Majorana WebGPU simulator from handwritten JavaScript to Rust compiled to WebAssembly.
+
+Repository:
+
+https://lnkd.in/e-wDysjg
+
+The active stack is now:
+
+Rust
+↓
+WebAssembly
+↓
+wgpu
+↓
+browser WebGPU
+↓
+GPU
+
+This was my first time building a browser application in Rust, so I’ve been approaching the migration the same way I’m approaching the numerical physics: one small, verifiable checkpoint at a time.
+
+So far I have:
+
+• installed and configured the Rust/WebAssembly toolchain
+• moved the browser entry point from main.js to src/lib.rs
+• set up Cargo, Trunk, wasm-bindgen, web-sys, and wgpu
+• successfully compiled Rust to WebAssembly and executed it in the browser
+• accessed and updated the DOM directly from Rust/WASM
+• created a wgpu::Instance
+• asynchronously requested a WebGPU adapter from Rust
+• verified adapter acquisition in the browser
+• documented a reproducible installation and local-development workflow
+• separated generated Cargo/Trunk output from source-controlled files
+
+The current browser checkpoint is:
+
+Rust/WASM
+↓
+wgpu::Instance
+↓
+request_adapter(...)
+↓
+compatible WebGPU adapter acquired
+
+One thing I’m appreciating about Rust already is how much the language forces me to be explicit about concepts that JavaScript can make easy to gloss over: ownership, borrowing, asynchronous execution, result handling, and type boundaries.
+
+For a numerical GPU project, that explicitness is useful rather than incidental.
+The next checkpoint is deliberately small again:
+
+wgpu::Adapter
+↓
+wgpu::Device + wgpu::Queue
+↓
+four-real-component Majorana state [f32; 4]
+↓
+16-byte GPU buffer
+↓
+CPU → GPU upload
+↓
+GPU → CPU readback verification
+
+Only after that memory path is proven will I move on to the first WGSL compute operation and the Majorana/J-DFT mathematics.
+
+I’m trying to make the repository useful as more than a finished demo. The README now documents the mathematical reasoning, Rust/WebAssembly setup, WebGPU architecture, build process, testing roadmap, and exact development checkpoint so someone else can reproduce the project rather than just look at the final result.
+
+This project has become a useful intersection of several areas I’m actively developing: Rust, GPU programming, WebAssembly, numerical methods, computational physics, and test-driven scientific software.
+
+If your team works in scientific computing, GPU/software infrastructure, simulation, Rust, or numerical engineering, I’d be glad to connect.
+
+AI-assisted drafting was used for this post. I reviewed the technical content and wording before publishing.
+
+hashtag#Rust hashtag#WebGPU hashtag#WebAssembly hashtag#ScientificComputing hashtag#ComputationalPhysics hashtag#GPUComputing hashtag#OpenSource
 
 # 2026/08/23
 
