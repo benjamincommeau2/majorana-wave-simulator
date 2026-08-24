@@ -1,41 +1,20 @@
-# This section describes the Rust package/project itself.
-[package]
+[package] # Starts the section that describes our Rust project.
 
-# This is the name Cargo uses for our project.
-name = "majorana-wave-simulator"
+name = "majorana-wave-simulator" # Gives this Rust project its Cargo package name.
 
-# This is the current version number of our project.
-version = "0.1.0"
+version = "0.1.0" # Sets the current version number of this Rust project.
+# major.minor.patch
 
-# This tells Rust which language edition/syntax rules we are using.
-edition = "2024"
+edition = "2024" # Tells Rust which language edition and syntax rules this project uses.
 
+[lib] # Starts the section that describes the Rust library we want Cargo to build.
 
-# This section describes the Rust library that we are building.
-[lib]
+crate-type = ["cdylib"] # Tells Rust to build a C-compatible dynamic library that can be turned into WebAssembly.
 
-# "cdylib" tells Rust to build a library that can be turned into WebAssembly.
-crate-type = ["cdylib"]
+[dependencies] # Starts the section where we list external Rust libraries this project uses.
 
+wasm-bindgen = "0.2" # Adds wasm-bindgen, which lets Rust communicate with JavaScript and browser APIs.
 
-# This section lists external Rust libraries our project needs.
-[dependencies]
+console_error_panic_hook = "0.1" # Makes Rust crash messages easier to read in the browser console.
 
-# wasm-bindgen creates the bridge between Rust/WebAssembly and the browser.
-wasm-bindgen = "0.2"
-
-# web-sys gives Rust access to browser APIs such as Window and Document.
-web-sys = { version = "0.3", features = [
-
-    # Gives Rust access to the browser's HTML Document object.
-    "Document",
-
-    # Gives Rust access to HTML elements found inside the document.
-    "Element",
-
-    # Gives Rust access to the browser Window object.
-    "Window",
-] }
-
-# This makes Rust panic/error messages easier to read in the browser console.
-console_error_panic_hook = "0.1"
+web-sys = { version = "0.3", features = ["Document", "Element", "Window"] } # Gives Rust access to browser objects like the window, page document, and HTML elements.
