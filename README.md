@@ -1,6 +1,24 @@
 # Majorana WebGPU Wave Simulator
 
-A browser-based, GPU-accelerated numerical wave simulator built around a **real four-component Majorana spinor**, WebGPU, spectral/SLAC spatial derivatives, and a proposed **J-DFT** based on a real complex structure
+A browser-based, GPU-accelerated numerical wave simulator written in Rust, compiled to WebAssembly, and built around a real four-component Majorana spinor, WebGPU, spectral/SLAC spatial derivatives, and a proposed J-DFT based on a real complex structure.
+
+The browser application is implemented in Rust and compiled to WebAssembly.
+
+The current software stack is:
+
+```text
+Rust
+    ↓
+WebAssembly
+    ↓
+wgpu
+    ↓
+browser WebGPU
+    ↓
+GPU
+```
+
+The Rust migration replaces the handwritten JavaScript host-side WebGPU code; it does not replace WebGPU or WGSL.
 
 ```math
 J=i\gamma^5,
@@ -802,29 +820,35 @@ Important layout goals are:
 
 ---
 
-# WebGPU Architecture
+# Rust / WebGPU Architecture
 
 The simulation is implemented with WebGPU rather than WebGL.
 
 The basic hierarchy is:
 
 ```text
-navigator.gpu
-    ↓
-GPUAdapter
-    ↓
-GPUDevice
-    ↓
-GPUBuffer
-    ↓
+Rust / WebAssembly
+        ↓
+wgpu::Instance
+        ↓
+wgpu::Adapter
+        ↓
+wgpu::Device + wgpu::Queue
+        ↓
+wgpu::Buffer
+        ↓
 Bind Groups
-    ↓
+        ↓
 Compute Pipelines
-    ↓
+        ↓
 Command Encoders
-    ↓
-GPU Queue
+        ↓
+browser WebGPU
+        ↓
+GPU
 ```
+
+The browser's native WebGPU implementation still ultimately provides the GPU access. The `wgpu` Rust crate provides the host-side API used by the simulator and maps to browser WebGPU when compiled for WebAssembly.
 
 The development machine used by the original prototype reported:
 
@@ -870,21 +894,55 @@ This limit is another reason the physical wavefunction representation should rem
 
 # Development Environment
 
-The original project was developed with:
+The active project is currently developed with:
 
 - Windows,
 - Visual Studio Code,
-- Live Server / Go Live,
+- Rust,
+- Cargo,
+- rustup,
+- the `wasm32-unknown-unknown` Rust target,
+- Trunk,
+- WebAssembly,
+- `wasm-bindgen`,
+- `wasm-bindgen-futures`,
+- `web-sys`,
+- `wgpu`,
+- WGSL for GPU compute shaders,
 - Chrome / Chromium with WebGPU support,
-- JavaScript ES modules,
 - Git,
 - GitHub,
-- SSH authentication,
-- Ed25519 SSH key,
 - NVIDIA RTX 4070 Super,
 - NVIDIA Lovelace architecture.
 
+The earlier JavaScript prototype used VS Code Live Server / Go Live.
+
+The Rust/WebAssembly implementation is instead built and served with Trunk:
+
+trunk serve --open
+
+Live Server alone is not sufficient for the active Rust implementation because the Rust source must first be compiled to WebAssembly.
+
 The active repository continues under the MIT License.
+
+# Rust Build Artifacts and Repository Storage
+
+Cargo and Trunk generate local build artifacts that are not part of the source repository.
+
+The project currently ignores:
+
+target/
+dist/
+
+`target/` contains Cargo compilation outputs, dependency builds, caches, and WebAssembly build intermediates.
+
+`dist/` contains the generated website output produced by Trunk.
+
+Both directories can be regenerated and should not be committed.
+
+`Cargo.lock`, by contrast, is intentionally committed. It records the exact dependency versions selected by Cargo and helps make application builds reproducible.
+
+Before introducing new build tools or asset pipelines, generated files and directories should be identified and added to `.gitignore` before they are accidentally committed.
 
 ---
 
@@ -908,7 +966,7 @@ The pivot should be visible in commit history and documentation rather than sile
 
 ---
 
-# Inherited Implementation Checkpoint
+# Historical JavaScript Checkpoint
 
 At the last documented Weyl checkpoint, the browser/WebGPU setup had reached:
 
@@ -926,7 +984,7 @@ A four-`Float32` CPU spinor existed and a 16-byte GPU storage buffer had been al
 
 The Majorana repo should re-establish this checkpoint using Majorana naming and semantics rather than silently assuming that later GPU functionality already exists.
 
-The smallest next implementation steps should remain:
+After the Rust implementation has re-established the GPU adapter, device, and queue, the smallest state-memory implementation steps should remain:
 
 ```text
 create 4-real Majorana CPU state
@@ -943,6 +1001,48 @@ only then introduce the first Majorana matrix / J operation
 This preserves the original incremental development philosophy.
 
 ---
+
+# Current Rust Migration Checkpoint
+
+The active Majorana repository has begun migrating its browser host code from JavaScript to Rust/WebAssembly.
+
+The following Rust browser foundation has been established:
+
+```text
+Rust toolchain installed
+        ↓
+wasm32-unknown-unknown target installed
+        ↓
+Trunk installed
+        ↓
+Cargo project created
+        ↓
+Rust compiled to WebAssembly
+        ↓
+browser successfully executes Rust startup code
+        ↓
+Rust successfully accesses the HTML document
+        ↓
+Rust updates the browser DOM
+```
+
+The previous `main.js` entry point has been removed.
+
+The current browser entry path is:
+
+```text
+index.html
+    ↓
+Trunk
+    ↓
+src/lib.rs
+    ↓
+Rust / WebAssembly
+```
+
+The project has also introduced `wgpu` and `wasm-bindgen-futures` as dependencies in preparation for recreating the previous WebGPU initialization checkpoint in Rust.
+
+A GPU adapter and device have not yet been requested by the Rust implementation.
 
 # Development Philosophy
 
@@ -1023,7 +1123,15 @@ CPU-side tests should eventually cover:
 - Bessel coefficients and analytic tail bounds if retained,
 - analytic free Majorana solutions.
 
-A likely unit-testing framework remains Vitest, but the exact framework should be selected deliberately.
+CPU-side mathematical tests should use Rust's built-in test framework wherever practical:
+
+cargo test
+
+Browser/WebAssembly integration testing should be selected deliberately once the first wgpu integration checkpoint is working.
+
+Potential tools include Rust/WASM browser-testing infrastructure and, where full browser automation is useful, Playwright.
+
+The testing stack should not require JavaScript unit-test infrastructure merely because the application executes in a browser.
 
 ---
 
@@ -1427,11 +1535,14 @@ test: compare direct J-DFT with packed complex FFT
 If development continues in another AI conversation, provide the AI with this repository or, at minimum:
 
 - this `README.md`,
+- `Cargo.toml`,
+- `Cargo.lock`,
+- `.gitignore`,
 - `index.html`,
-- `main.js`,
+- Rust files under `src/`,
 - test files,
-- shader files,
-- configuration files.
+- WGSL shader files when they exist,
+- Trunk configuration if one is later introduced.
 
 The AI should preserve the following development style:
 
@@ -1455,37 +1566,61 @@ The AI should preserve the following development style:
 18. Preserve numerical CPU reference implementations when useful for testing optimized GPU code.
 19. Treat the Weyl repository as design history, not as the active mathematical specification.
 20. When a mathematical assumption conflicts with the memory/performance architecture, surface the conflict explicitly before coding around it.
+21. The active browser host implementation is Rust/WebAssembly, not handwritten JavaScript.
+22. Use `wgpu` for WebGPU host-side interaction.
+23. Keep WGSL as the GPU shader language unless an explicit architectural decision changes it.
+24. Introduce Rust code one small line or concept at a time during interactive development.
+25. Explain unfamiliar Rust syntax when it is first introduced.
+26. Before introducing a new tool that generates files, identify any build/cache/output directories that should be added to `.gitignore`.
+27. Do not ignore `Cargo.lock`; it is intentionally retained for reproducible application builds.
+28. Do not reintroduce `main.js` merely as a WebGPU host layer unless there is a deliberate documented reason.
+
 
 ---
 
 # Exact Handoff Point for a Future LLM
 
-The previous Weyl implementation had successfully reached GPU buffer allocation but had not yet performed the first CPU-to-GPU state upload.
+The Majorana simulator has migrated its browser bootstrap from JavaScript to Rust/WebAssembly.
 
-The Majorana implementation should begin from the equivalent four-real-component checkpoint rather than jumping directly into FFTs or propagation.
-
-The immediate order should be:
+Confirmed working:
 
 ```text
-CPU Float32Array Majorana state
-        ↓
-16-byte GPUBuffer
-        ↓
-device.queue.writeBuffer(...)
-        ↓
-GPU → CPU readback verification
+index.html
+    ↓
+Trunk
+    ↓
+Rust
+    ↓
+WebAssembly
+    ↓
+browser DOM access
 ```
 
-The next assistant should **not jump ahead** to:
+The old `main.js` file has been removed.
 
-- a full WebGPU FFT,
-- a J-DFT optimization,
-- the SLAC derivative,
-- the complete Majorana generator,
-- the Chebyshev recurrence,
-- or rendering,
+The Rust project currently declares dependencies on:
 
-until the basic four-real-component GPU memory path has been implemented and tested.
+- `wasm-bindgen`,
+- `web-sys`,
+- `console_error_panic_hook`,
+- `wgpu`,
+- `wasm-bindgen-futures`.
+
+The Rust/WASM startup path has been verified in the browser by successfully replacing the page status text with:
+
+Rust/WASM loaded successfully.
+
+The immediate next implementation goal is to recreate the first WebGPU initialization operation in Rust:
+
+create wgpu::Instance
+        ↓
+request wgpu::Adapter
+        ↓
+verify adapter acquisition
+        ↓
+request wgpu::Device + wgpu::Queue
+
+Do not jump ahead to GPU buffers, WGSL shaders, FFTs, J-DFTs, SLAC derivatives, or propagation until each preceding Rust/wgpu checkpoint has been implemented and observed successfully.
 
 ---
 
