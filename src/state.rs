@@ -37,5 +37,13 @@ impl MajoranaState { // Starts an implementation block where we define functions
 
       } // Closes the `components` method.
 
-  } // Closes the `impl MajoranaState` block that contains methods belonging to `MajoranaState`.
+  pub fn from_bytes(bytes: &[u8]) -> Self { // Defines a public constructor that rebuilds a Majorana state from raw CPU-readable GPU bytes.
+
+    Self { components: bytemuck::pod_read_unaligned(bytes) } // Reads exactly sixteen bytes into four f32 components without requiring the byte slice itself to have f32 alignment.
+
+  } // Closes the `from_bytes` constructor.
+
+  // `from_bytes` is now ready to be checked by the integration test that was written before this implementation.
+
+} // Closes the `impl MajoranaState` block that contains methods belonging to `MajoranaState`.
 

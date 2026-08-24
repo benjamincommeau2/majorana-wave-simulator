@@ -60,11 +60,95 @@ pub fn start() -> Result<(), JsValue> { // Defines the startup function and says
 
     }); // Allocates a GPU buffer exactly large enough for the four-f32 Majorana state and allows storage use, CPU-to-GPU copies, and later GPU-to-CPU copies.
 
+    let readback_buffer = device.create_buffer( // Asks the WebGPU device to allocate a new GPU buffer for reading data back to the CPU.
+      
+      &wgpu::BufferDescriptor { // Creates a temporary GPU staging buffer that we will use to copy the Majorana state back toward CPU-readable memory.
+
+        label: Some("Majorana Readback Buffer"), // Gives the buffer a human-readable name that can help with debugging and GPU diagnostics.
+        
+        size: std::mem::size_of_val(majorana_components) as wgpu::BufferAddress, // Gives the readback buffer exactly enough space to hold the four-f32 Majorana state.
+  
+        usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ, // Allows the GPU to copy data into this buffer and later allows the CPU to map the buffer for reading.
+        
+        mapped_at_creation: false // Leaves the buffer unmapped initially because we first need the GPU to copy the state into it.
+
+    }); // Makes the buffer 16 bytes, allows GPU copies into it, and allows the CPU to map it later for reading.
+
+    let mut encoder = device.create_command_encoder( // Creates a command encoder that will record GPU operations before they are submitted to the GPU. Mut stands for mutable.
+
+      &wgpu::CommandEncoderDescriptor { // Starts the configuration for the command encoder.
+
+        label: Some("Majorana Readback Encoder"), // Gives the encoder a readable debugging label.
+
+    }); // Finishes the create_command_encoder call and stores the encoder in a mutable variable.
+
+    encoder.copy_buffer_to_buffer( // Records a command that will copy the Majorana state from the GPU working buffer into the CPU-readable staging buffer.
+
+      &state_buffer, // Uses the existing GPU Majorana state buffer as the source of the copy.
+
+      0, // Starts reading from byte offset 0 at the beginning of the source buffer.
+
+      &readback_buffer, // Uses the readback staging buffer as the destination of the copy.
+
+      0, // Starts writing at byte offset 0 at the beginning of the destination buffer.
+
+      std::mem::size_of_val(majorana_components) as wgpu::BufferAddress // Copies exactly the number of bytes occupied by the four-f32 Majorana state.
+
+    ); // Finishes recording the buffer-to-buffer copy command.
+
     queue.write_buffer(&state_buffer, 0, bytemuck::cast_slice(majorana_components)); // Converts the tested f32 components into bytes and uploads those exact bytes into the GPU buffer.
 
-    status.set_text_content(Some("Majorana state uploaded to GPU successfully.")); // Updates the webpage only after the four-component CPU state has been written into the GPU buffer.
-    
+    queue.submit(Some(encoder.finish())); // Finishes recording the encoder and submits its completed command buffer to the GPU queue for execution. In Rust, Some is a variant of the Option enum that is used to wrap a value when a value is successfully present. Because Rust does not have a null value, it uses Option to safely represent either the existence of data (Some(value)) or its absence (None).
 
+    let readback_slice = readback_buffer.slice(..); // Creates a view covering the entire readback buffer so we can request CPU-readable mapping for all sixteen bytes.
+
+    let readback_buffer_for_callback = readback_buffer.clone(); // Clones the lightweight wgpu buffer handle so the asynchronous mapping callback can safely access the same underlying GPU buffer later.
+
+    let expected_components = *majorana_components; // Copies the four expected f32 values into an owned array that can safely move into the asynchronous readback callback.
+
+    let status_for_readback = status.clone(); // Clones the browser status-element handle so the asynchronous readback callback can update the webpage later.
+
+    readback_slice.map_async( // Asynchronously asks WebGPU to make the copied readback-buffer bytes accessible to CPU code.
+
+      wgpu::MapMode::Read, move |map_result| { // Requests read-only mapping and starts a callback that will run after WebGPU finishes preparing the buffer.
+
+        match map_result { // Examines whether WebGPU successfully mapped the readback buffer or returned an error.
+
+          Ok(()) => { // Starts the success branch, which runs only when the readback buffer is ready for CPU access.
+
+            let mapped_range = readback_buffer_for_callback.slice(..).get_mapped_range().expect("Could not access mapped readback bytes"); // Gets the mapped byte view and stops with a clear error if wgpu cannot provide access to that mapped range.
+
+            let reconstructed_state = state::MajoranaState::from_bytes(&mapped_range); // Uses our tested byte-conversion constructor to rebuild the four-component Majorana state from the GPU readback bytes.
+
+            if reconstructed_state.components() == &expected_components { // Checks whether all four values reconstructed from GPU memory exactly match the four values originally uploaded.
+
+              status_for_readback.set_text_content(Some("GPU round-trip verified: [1.0, 0.0, 0.0, 0.0].")); // Shows a visible success message only when the GPU-readback state matches the expected Majorana state.
+
+            } else { // Starts the failure branch when the four GPU-readback components do not exactly match the expected CPU components.
+
+              status_for_readback.set_text_content(Some("GPU round-trip verification failed: readback values did not match the uploaded Majorana state.")); // Shows a visible error message when the GPU data round trip changes or corrupts any component.
+
+            } // Closes the success-versus-failure comparison of the GPU readback values.
+
+            drop(mapped_range); // Explicitly releases the CPU-readable mapped byte view before we ask WebGPU to unmap the underlying buffer.
+
+            readback_buffer_for_callback.unmap(); // Releases the CPU mapping now that the readback bytes have been copied and are no longer being accessed.
+
+          } // Closes the successful `Ok(())` mapping branch.
+
+          Err(map_error) => { // Starts the failure branch when WebGPU cannot make the readback buffer accessible to CPU code.
+
+            status_for_readback.set_text_content(Some(&format!("GPU readback mapping failed: {map_error:?}"))); // Displays the mapping error in the browser so the failure is visible instead of silently disappearing.
+
+          } // Closes the `Err(map_error)` branch that handles WebGPU mapping failures.
+
+        } // Closes the `match map_result` statement after both success and failure cases have been handled.
+
+      } // Closes the asynchronous mapping callback that handles successful or failed GPU readback mapping.
+
+    ); // Finishes the `map_async` call that requested CPU-readable access to the readback buffer.
+
+    status.set_text_content(Some("Majorana state uploaded to GPU successfully.")); // Updates the webpage only after the four-component CPU state has been written into the GPU buffer.   
 
   }); // Closes the async block and finishes the spawn_local function call.
 

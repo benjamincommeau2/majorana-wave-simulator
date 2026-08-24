@@ -50,3 +50,17 @@ fn majorana_state_occupies_sixteen_bytes() { // Defines a test that verifies the
   } // Closes the `majorana_state_occupies_sixteen_bytes` test function.
 
   // This is a regression/characterization test because the current `[f32; 4]` implementation may already satisfy the 16-byte requirement.
+
+#[test] // Tells Rust that the next function is an automated test for converting GPU-style bytes back into a Majorana state.
+
+fn majorana_state_can_be_created_from_readback_bytes() { // Defines the behavior we expect from the future `from_bytes` conversion function.
+
+  let expected_components: [f32; 4] = [1.0, 0.0, 0.0, 0.0]; // Defines the four floating-point values that we expect the simulated GPU readback bytes to represent.
+
+  let readback_bytes = bytemuck::cast_slice(&expected_components); // Views those four f32 values as the same sixteen raw bytes that a mapped GPU buffer would expose to the CPU.
+
+  let reconstructed_state = state::MajoranaState::from_bytes(readback_bytes); // Asks the production state module to rebuild a MajoranaState from the sixteen raw readback bytes.
+
+  assert_eq!(reconstructed_state.components(), &expected_components); // Passes only if decoding the raw bytes reproduces the exact four expected f32 components.
+
+  } // Closes the `majorana_state_can_be_created_from_readback_bytes` test function.
