@@ -1,9 +1,12 @@
-<!doctype html>
-<html>
-<body>
-  <h1>Weyl WebGPU Simulator</h1>
-  <pre id="status">Starting...</pre>
-
-  <script type="module" src="./main.js"></script>
-</body>
-</html>
+<!doctype html> <!-- Tells the browser that this file uses modern HTML5. -->
+<html lang="en"> <!-- Starts the HTML document and tells the browser that the page language is English. -->
+  <head> <!-- Starts the head section, which stores page information that is not part of the main visible content. -->
+    <meta charset="UTF-8"> <!-- Tells the browser to use UTF-8 text encoding so letters, symbols, and special characters display correctly. -->
+    <title>Majorana Wave Simulator</title> <!-- Sets the text shown on the browser tab for this page. -->
+    <link data-trunk rel="rust"> <!-- Tells Trunk to build and connect our Rust WebAssembly code to this webpage. -->
+  </head> <!-- Closes the head section of the HTML document. -->
+  <body> <!-- Starts the visible part of the webpage that the user can see in the browser. -->
+    <h1>Majorana WebGPU Wave Simulator</h1> <!-- Displays the main visible heading at the top of the webpage. -->
+    <pre id="status">Starting Rust...</pre> <!-- Creates a visible status area that Rust will later find by id="status" and replace with a success message. -->
+  </body> <!-- Closes the visible body section of the webpage. -->
+</html> <!-- Closes the entire HTML document. -->
