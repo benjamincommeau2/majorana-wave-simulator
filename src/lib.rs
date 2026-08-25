@@ -49,30 +49,9 @@ pub fn start() -> Result<(), JsValue> { // Defines the startup function and says
 
     let majorana_components = majorana_state.components(); // Borrows the tested four-f32 component array so the WebGPU code can upload the same state representation.
 
-    let state_buffer = device.create_buffer(
-      &wgpu::BufferDescriptor { 
-        
-        label: Some("Majorana State Buffer"), // Gives the GPU buffer a readable debugging label.
+    let buffer_size = std::mem::size_of_val(majorana_components) as wgpu::BufferAddress; // Calculates the number of bytes needed to store one four-component Majorana state on the GPU.
 
-        size: std::mem::size_of_val(majorana_components) as wgpu::BufferAddress, // Sizes the GPU buffer from the tested four-f32 component array, which currently occupies exactly 16 bytes.
-
-        usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::COPY_SRC, mapped_at_creation: false // Allows shader storage access, CPU-to-GPU writes, GPU copies, and leaves the buffer initially unmapped.
-
-    }); // Allocates a GPU buffer exactly large enough for the four-f32 Majorana state and allows storage use, CPU-to-GPU copies, and later GPU-to-CPU copies.
-
-    let readback_buffer = device.create_buffer( // Asks the WebGPU device to allocate a new GPU buffer for reading data back to the CPU.
-      
-      &wgpu::BufferDescriptor { // Creates a temporary GPU staging buffer that we will use to copy the Majorana state back toward CPU-readable memory.
-
-        label: Some("Majorana Readback Buffer"), // Gives the buffer a human-readable name that can help with debugging and GPU diagnostics.
-        
-        size: std::mem::size_of_val(majorana_components) as wgpu::BufferAddress, // Gives the readback buffer exactly enough space to hold the four-f32 Majorana state.
-  
-        usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ, // Allows the GPU to copy data into this buffer and later allows the CPU to map the buffer for reading.
-        
-        mapped_at_creation: false // Leaves the buffer unmapped initially because we first need the GPU to copy the state into it.
-
-    }); // Makes the buffer 16 bytes, allows GPU copies into it, and allows the CPU to map it later for reading.
+    let (state_buffer, readback_buffer) = gpu::buffers::create_majorana_buffers(&device, buffer_size); // Creates both GPU buffers through the dedicated buffer module instead of exposing their low-level configuration here.
 
     let mut encoder = device.create_command_encoder( // Creates a command encoder that will record GPU operations before they are submitted to the GPU. Mut stands for mutable.
 
