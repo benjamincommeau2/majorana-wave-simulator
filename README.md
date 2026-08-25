@@ -1,5 +1,9 @@
 # Majorana WebGPU Wave Simulator
 
+## Live Demo
+
+[Launch the Majorana WebGPU Wave Simulator](https://benjamincommeau2.github.io/majorana-wave-simulator/)
+
 A browser-based, GPU-accelerated numerical wave simulator written in Rust, compiled to WebAssembly, and built around a real four-component Majorana spinor, WebGPU, spectral/SLAC spatial derivatives, and a proposed J-DFT based on a real complex structure.
 
 The browser application is implemented in Rust and compiled to WebAssembly.
