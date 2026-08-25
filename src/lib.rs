@@ -19,6 +19,8 @@ use wasm_bindgen_futures::spawn_local; // Imports the helper that lets browser-b
 
 pub mod state; // Makes the state module part of the crate's public API so integration tests in tests/ can access it.
 
+pub mod gpu; // Makes the `src/gpu/` module available to the rest of the crate.
+
 #[wasm_bindgen(start)] // Tells wasm-bindgen to run the next function automatically when the WebAssembly module starts.
 
 pub fn start() -> Result<(), JsValue> { // Defines the startup function and says it can either succeed or return a JavaScript-compatible error.
@@ -35,13 +37,11 @@ pub fn start() -> Result<(), JsValue> { // Defines the startup function and says
 
   spawn_local(async move { // Starts an asynchronous Rust task where our WebGPU initialization will run.
 
-    let instance = wgpu::Instance::default(); // Creates the main wgpu entry point used to discover and connect to available GPU adapters.
-
-    let adapter = instance.request_adapter(&wgpu::RequestAdapterOptions::default()).await.expect("Could not find a compatible GPU adapter"); // Asks wgpu for a GPU adapter, waits for the browser to return one, and stops with an error if none is available. In Rust, the ampersand (&) is primarily used to create or specify references, which allows you to borrow data without taking ownership of it.
+    let adapter = gpu::context::request_adapter().await; // Delegates WebGPU adapter discovery to the dedicated GPU context module.
 
     status.set_text_content(Some("WebGPU adapter acquired successfully.")); // Changes the webpage status only after Rust successfully receives a compatible GPU adapter.
 
-    let (device, queue) = adapter.request_device(&wgpu::DeviceDescriptor::default()).await.expect("Could not create WebGPU device"); // Requests a logical GPU device and command queue from the adapter, waits for them to be created, and stops if the request fails.
+    let (device, queue) = gpu::context::request_device_and_queue(&adapter).await; // Delegates WebGPU device and queue creation to the dedicated GPU context module.
 
     status.set_text_content(Some("WebGPU device and queue created successfully.")); // Updates the page only after Rust successfully creates the GPU device and command queue.
 
