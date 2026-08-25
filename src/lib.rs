@@ -45,6 +45,16 @@ pub fn start() -> Result<(), JsValue> { // Defines the startup function and says
 
     let (device, queue) = gpu::context::request_device_and_queue(&adapter).await; // Delegates WebGPU device and queue creation to the dedicated GPU context module.
 
+    let apply_j_shader = gpu::shaders::create_apply_j_shader(&device); // Creates the WGSL shader module and keeps its handle so the compute pipeline can use it.
+
+    let apply_j_pipeline = gpu::pipelines::create_apply_j_pipeline( // Creates the J compute pipeline and keeps its handle so we can connect GPU resources to it.
+
+      &device, // Gives the pipeline helper access to the existing WebGPU device.
+
+      &apply_j_shader, // Gives the pipeline helper the already-created Apply J shader module.
+
+    ); // Finishes the compute-pipeline creation call.
+
     status.set_text_content(Some("WebGPU device and queue created successfully.")); // Updates the page only after Rust successfully creates the GPU device and command queue.
 
     let majorana_state = state::MajoranaState::new(); // Creates the initial four-component state through our tested production `MajoranaState` API instead of duplicating the raw array here.
@@ -55,37 +65,55 @@ pub fn start() -> Result<(), JsValue> { // Defines the startup function and says
 
     let (state_buffer, readback_buffer) = gpu::buffers::create_majorana_buffers(&device, buffer_size); // Creates both GPU buffers through the dedicated buffer module instead of exposing their low-level configuration here.
 
-    let mut encoder = device.create_command_encoder( // Creates a command encoder that will record GPU operations before they are submitted to the GPU. Mut stands for mutable.
+    let apply_j_bind_group = gpu::bind_groups::create_apply_j_bind_group( // Creates the resource connection between the existing state buffer and the J compute pipeline so the compute pass can use it.
 
-      &wgpu::CommandEncoderDescriptor { // Starts the configuration for the command encoder.
+      &device, // Gives the helper access to the WebGPU device.
 
-        label: Some("Majorana Readback Encoder"), // Gives the encoder a readable debugging label.
+      &apply_j_pipeline, // Gives the helper the compute pipeline whose binding layout must be satisfied.
 
-    }); // Finishes the create_command_encoder call and stores the encoder in a mutable variable.
+      &state_buffer, // Connects the existing sixteen-byte Majorana state buffer to shader binding zero.
 
-    encoder.copy_buffer_to_buffer( // Records a command that will copy the Majorana state from the GPU working buffer into the CPU-readable staging buffer.
+    ); // Finishes the bind-group creation call.
 
-      &state_buffer, // Uses the existing GPU Majorana state buffer as the source of the copy.
+    let mut encoder = gpu::commands::create_command_encoder(&device); // Creates the GPU command encoder through the dedicated command module instead of exposing that low-level setup in `lib.rs`.
 
-      0, // Starts reading from byte offset 0 at the beginning of the source buffer.
+    gpu::commands::record_apply_j( // Delegates recording of the Apply J compute pass to the dedicated GPU command module.
 
-      &readback_buffer, // Uses the readback staging buffer as the destination of the copy.
+      &mut encoder, // Gives the helper mutable access to the existing command encoder.
 
-      0, // Starts writing at byte offset 0 at the beginning of the destination buffer.
+      &apply_j_pipeline, // Gives the helper the existing Apply J compute pipeline.
 
-      std::mem::size_of_val(majorana_components) as wgpu::BufferAddress // Copies exactly the number of bytes occupied by the four-f32 Majorana state.
+      &apply_j_bind_group, // Gives the helper the existing bind group connected to the Majorana state buffer.
 
-    ); // Finishes recording the buffer-to-buffer copy command.
+    ); // Finishes recording the Apply J compute commands.
+
+    gpu::commands::record_readback_copy( // Delegates recording of the GPU-to-readback buffer copy to the dedicated command module.
+
+      &mut encoder, // Gives the helper mutable access to the existing command encoder.
+
+      &state_buffer, // Gives the helper the GPU buffer containing the transformed Majorana state.
+
+      &readback_buffer, // Gives the helper the CPU-readable staging buffer that will receive the copied bytes.
+
+      buffer_size, // Copies exactly the sixteen bytes already calculated for one Majorana state.
+
+    ); // Finishes recording the readback-copy command.
 
     queue.write_buffer(&state_buffer, 0, bytemuck::cast_slice(majorana_components)); // Converts the tested f32 components into bytes and uploads those exact bytes into the GPU buffer.
 
-    queue.submit(Some(encoder.finish())); // Finishes recording the encoder and submits its completed command buffer to the GPU queue for execution. In Rust, Some is a variant of the Option enum that is used to wrap a value when a value is successfully present. Because Rust does not have a null value, it uses Option to safely represent either the existence of data (Some(value)) or its absence (None).
+    gpu::commands::submit_commands( // Delegates finishing and submitting the recorded GPU command buffer to the dedicated command module.
+
+      &queue, // Gives the helper access to the existing WebGPU command queue.
+
+      encoder, // Transfers ownership of the completed command encoder so the helper can finish and submit it.
+
+    ); // Finishes the command-submission call.
 
     let readback_slice = readback_buffer.slice(..); // Creates a view covering the entire readback buffer so we can request CPU-readable mapping for all sixteen bytes.
 
     let readback_buffer_for_callback = readback_buffer.clone(); // Clones the lightweight wgpu buffer handle so the asynchronous mapping callback can safely access the same underlying GPU buffer later.
 
-    let expected_components = *majorana_components; // Copies the four expected f32 values into an owned array that can safely move into the asynchronous readback callback.
+    let expected_components = physics::j::apply_j(majorana_components); // Computes the independently tested CPU J result that the GPU-transformed readback state must match.
 
     let status_for_readback = status.clone(); // Clones the browser status-element handle so the asynchronous readback callback can update the webpage later.
 
@@ -103,7 +131,7 @@ pub fn start() -> Result<(), JsValue> { // Defines the startup function and says
 
             if reconstructed_state.components() == &expected_components { // Checks whether all four values reconstructed from GPU memory exactly match the four values originally uploaded.
 
-              status_for_readback.set_text_content(Some("GPU round-trip verified: [1.0, 0.0, 0.0, 0.0].")); // Shows a visible success message only when the GPU-readback state matches the expected Majorana state.
+              status_for_readback.set_text_content(Some("GPU J operation verified against CPU reference.")); // Reports success only after the GPU-computed J result exactly matches the independently computed CPU reference.
 
             } else { // Starts the failure branch when the four GPU-readback components do not exactly match the expected CPU components.
 
