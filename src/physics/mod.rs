@@ -1,0 +1,1 @@
+pub mod j; // Makes the J-operation implementation in `src/physics/j.rs` available as `physics::j`.

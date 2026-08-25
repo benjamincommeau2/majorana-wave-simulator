@@ -1,0 +1,56 @@
+name: Deploy Majorana Simulator to GitHub Pages # Gives this GitHub Actions workflow a readable name in the Actions tab.
+
+on: # Defines the events that are allowed to start this deployment workflow.
+  push: # Runs the workflow automatically when code is pushed.
+    branches: # Restricts automatic deployment to specific Git branches.
+      - main # Deploys only from the main branch.
+  workflow_dispatch: # Also lets us manually start the workflow from GitHub's Actions tab.
+
+permissions: # Grants this workflow only the repository permissions needed for GitHub Pages deployment.
+  contents: read # Allows the workflow to read the repository source code.
+  pages: write # Allows the workflow to publish a GitHub Pages deployment.
+  id-token: write # Allows GitHub to securely authenticate the Pages deployment.
+
+jobs: # Starts the section containing the jobs GitHub Actions will perform.
+  build: # Defines a job named `build` that will prepare the Rust/WASM website for deployment.
+    runs-on: ubuntu-latest # Runs the build on a fresh GitHub-hosted Linux machine.
+
+    steps: # Starts the ordered list of actions performed inside the build job.
+      - name: Checkout repository # Gives this step a readable name in the GitHub Actions interface.
+        uses: actions/checkout@v6 # Copies the repository source code onto the temporary build machine.
+
+      - name: Install Rust and WebAssembly target # Installs the Rust compiler and the WebAssembly compilation target required by this project.
+        uses: dtolnay/rust-toolchain@stable # Installs the current stable Rust toolchain using rustup.
+        with: # Starts the configuration passed to the Rust toolchain installer.
+          targets: wasm32-unknown-unknown # Adds the WebAssembly target that Trunk uses to compile our Rust application for the browser.
+
+      - name: Run Rust tests # Runs the automated Rust test suite before allowing the deployment build to continue.
+        run: cargo test # Stops the workflow immediately if any automated test fails.
+
+      - name: Install Trunk # Installs the Rust/WASM web bundler used to build this browser application.
+        run: cargo install trunk --locked --version 0.21.14 # Installs the same Trunk version that we have already verified locally.
+
+      - name: Build website with Trunk # Builds the optimized Rust/WASM website that GitHub Pages will publish.
+        run: trunk build --release --public-url /majorana-wave-simulator/ # Generates the production site in `dist/` and rewrites asset paths for this repository's GitHub Pages subdirectory.
+
+      - name: Configure GitHub Pages # Prepares GitHub Pages metadata and deployment settings for this workflow.
+        uses: actions/configure-pages@v5 # Uses GitHub's official Pages configuration action.
+
+      - name: Upload website artifact # Packages the generated Trunk website so the deployment job can publish it.
+        uses: actions/upload-pages-artifact@v4 # Uses GitHub's official Pages artifact uploader.
+        with: # Starts the configuration for the artifact upload.
+          path: ./dist # Uploads only Trunk's generated production website, not the source repository.
+
+  deploy: # Defines a separate job that publishes the website only after the build job succeeds.
+    needs: build # Prevents deployment from starting until the build job has completed successfully.
+    runs-on: ubuntu-latest # Runs the deployment on a fresh GitHub-hosted Linux machine.
+
+    environment: # Connects this deployment job to GitHub's Pages deployment environment.
+      name: github-pages # Uses the standard environment that GitHub Pages expects.
+      url: ${{ steps.deployment.outputs.page_url }} # Records the final public site URL produced by the deployment step.
+
+    steps: # Starts the ordered list of actions performed by the deployment job.
+      - name: Deploy website to GitHub Pages # Publishes the previously uploaded website artifact.
+        id: deployment # Gives this deployment step an ID so its generated page URL can be referenced above.
+        uses: actions/deploy-pages@v4 # Uses GitHub's official action to publish the Pages artifact.
+

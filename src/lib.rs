@@ -21,6 +21,8 @@ pub mod state; // Makes the state module part of the crate's public API so integ
 
 pub mod gpu; // Makes the `src/gpu/` module available to the rest of the crate.
 
+pub mod physics; // Makes the new CPU-side physics module available through the crate's public API.
+
 #[wasm_bindgen(start)] // Tells wasm-bindgen to run the next function automatically when the WebAssembly module starts.
 
 pub fn start() -> Result<(), JsValue> { // Defines the startup function and says it can either succeed or return a JavaScript-compatible error.
