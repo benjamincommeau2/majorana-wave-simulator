@@ -1,3 +1,62 @@
+# 2026/08/25
+
+https://www.linkedin.com/posts/benjamincommeau_rust-webgpu-webassembly-share-7498009118801141761-RHNY/?utm_source=share&utm_medium=member_desktop&rcm=ACoAACtxJGYB1ue63Kge-Z8YwDkr7dUOCr3VdCs
+
+Majorana WebGPU Simulator: Verifying the GPU Data Path and Refactoring for Comprehension
+
+Repo: https://lnkd.in/e-wDysjg
+
+Today I reached another important checkpoint in my browser-based Majorana wave simulator.
+
+The project is now running through a Rust → WebAssembly → wgpu → WebGPU stack, and I verified a complete CPU → GPU → CPU round trip for the simulator’s four-component real Majorana state.
+
+The current data path is:
+
+MajoranaState [1.0, 0.0, 0.0, 0.0]
+ → upload into a 16-byte GPU buffer
+ → copy into a GPU readback buffer
+ → asynchronously map the result back to CPU-visible memory
+ → reconstruct the Rust state from the returned bytes
+ → verify that all four components match exactly
+
+I also continued introducing a more formal test-driven development workflow around the Rust-side state logic.
+
+The current automated test suite verifies:
+
+→ the Majorana state has exactly four real components
+→ the initial state is [1.0, 0.0, 0.0, 0.0]
+→ the state occupies exactly 16 bytes
+→ GPU-style readback bytes can reconstruct the expected Majorana state
+
+Current result:
+
+ → 4 tests passed, 0 failed
+ → WebAssembly build passed
+ → GPU round-trip verified in the browser
+
+One of the biggest software-engineering lessons from this stage was about making the code easier to reason about.
+
+WebGPU code contains a lot of low-level setup: adapter discovery, device and queue creation, buffer descriptors, command encoders, copies, mapping, asynchronous callbacks, and readback handling.
+
+So I started refactoring the GPU stack by responsibility:
+ → gpu/context.rs → adapter, device, and queue initialization
+ → gpu/buffers.rs → GPU state and readback-buffer creation
+ → lib.rs → higher-level application orchestration
+
+After each extraction, I re-ran the Rust tests and WebAssembly build to make sure the refactor preserved behavior.
+
+I’m learning that software architecture is not only about making code easier for machines to execute. It is also about making complex systems easier for humans to understand, verify, and maintain.
+
+This engineering work sits underneath the physics architecture I’ve been developing for the simulator: a real four-component Majorana representation, spectral/SLAC spatial derivatives, and a proposed J-based spectral formulation using J=iγ5.
+
+Next: continue reducing the remaining GPU boilerplate, then place the first WGSL compute operation between the verified upload and readback paths and compare GPU results against a CPU reference calculation.
+
+The long-term goal remains the same: turn the theory into a publicly accessible, GPU-accelerated browser simulation while building the testing, numerical-validation, and software-engineering discipline needed to make the results trustworthy.
+
+Ai assisted.
+
+hashtag#Rust hashtag#WebGPU hashtag#WebAssembly hashtag#TDD hashtag#GPUComputing hashtag#ScientificComputing hashtag#NumericalMethods hashtag#QuantumPhysics hashtag#SoftwareEngineering
+
 # 2026/08/24
 
 https://lnkd.in/p/e8yR5QFb
