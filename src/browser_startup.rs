@@ -32,11 +32,11 @@ pub fn start() -> Result<(), JsValue> { // Defines the startup function and says
 
   spawn_local(async move { // Starts an asynchronous Rust task where our WebGPU initialization will run.
 
-    let adapter = gpu::context::request_adapter().await; // Delegates WebGPU adapter discovery to the dedicated GPU context module.
+    let adapter = gpu::gpu_context::request_adapter().await; // Delegates WebGPU adapter discovery to the explicitly named GPU context module.
 
     status.set_text_content(Some("WebGPU adapter acquired successfully.")); // Changes the webpage status only after Rust successfully receives a compatible GPU adapter.
 
-    let (device, queue) = gpu::context::request_device_and_queue(&adapter).await; // Delegates WebGPU device and queue creation to the dedicated GPU context module.
+    let (device, queue) = gpu::gpu_context::request_device_and_queue(&adapter).await; // Delegates WebGPU device and queue creation to the explicitly named GPU context module.
 
     let apply_j_shader = gpu::shaders::create_apply_j_shader(&device); // Creates the WGSL shader module and keeps its handle so the compute pipeline can use it.
 

@@ -1,4 +1,4 @@
-pub mod context; // Makes `src/gpu/context.rs` available as the `gpu::context` module.
+pub mod gpu_context; // Makes `src/gpu/gpu_context.rs` available as the clearly named `gpu::gpu_context` module.
 
 pub mod state_buffers; // Makes the dedicated Majorana state buffer module available as `gpu::state_buffers`.
 
