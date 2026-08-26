@@ -1,3 +1,69 @@
+# 2026/08/26
+
+https://www.linkedin.com/posts/benjamincommeau_github-benjamincommeau2majorana-wave-simulator-activity-7498416508033835008-abZz?utm_source=share&utm_medium=member_desktop&rcm=ACoAACtxJGYB1ue63Kge-Z8YwDkr7dUOCr3VdCs
+
+Majorana WebGPU Simulator: First GPU Physics Operation + Refactoring for Comprehension
+
+Repo: https://lnkd.in/e-wDysjg
+
+Since my last update, the project has moved from proving the GPU memory path to implementing the first actual physics operation on the GPU.
+
+The operation is the real Majorana structure
+
+J = iY ⊗ I
+
+acting on a four-component real state as
+
+(a, b, c, d) → (c, d, -a, -b)
+
+I first implemented a CPU reference version and added tests confirming both the expected component mapping and the important identity
+
+J²ψ = -ψ
+
+I then implemented the same transformation in WGSL and wired it into the existing Rust → WebAssembly → wgpu → WebGPU pipeline.
+
+The current compute path is now:
+
+MajoranaState
+→ upload to GPU storage buffer
+→ WGSL compute shader applies J
+→ copy to readback buffer
+→ reconstruct the Rust state
+→ compare against the CPU reference
+
+The automated suite is now:
+
+→ 6 tests passed
+→ WebAssembly/Trunk build passed
+
+I also made a significant architectural pivot in how I structure the code.
+
+The low-level GPU setup was becoming difficult to reason about as one large browser-startup file, so I started treating comprehensibility as an engineering requirement, not just a style preference.
+
+Recent refactors include:
+
+→ moving browser/WASM orchestration out of lib.rs into browser_startup.rs
+→ reducing lib.rs to a small crate/module map
+→ replacing vague mod.rs files with gpu.rs and physics.rs
+→ renaming buffers.rs → state_buffers.rs
+→ renaming context.rs → gpu_context.rs
+→ renaming shaders.rs → shader_modules.rs
+→ separating GPU commands, pipelines, bind groups, shader creation, buffers, and context by responsibility
+
+Each refactor followed the same rule:
+
+GREEN → refactor → GREEN
+
+The larger lesson for me is that scientific software has two correctness problems: the mathematics has to be right, and the implementation has to remain understandable enough to verify.
+
+Next I’ll continue reducing the remaining readback/orchestration complexity, verify the full GPU J path at runtime, and then build toward the spectral Majorana evolution.
+
+If this kind of work is relevant to your team and you think my approach to Rust, GPU computing, numerical methods, scientific software, or simulation could be useful, I’d genuinely appreciate a referral or introduction to a suitable role.
+
+AI-assisted drafting. I reviewed the technical content and wording before publishing.
+
+#Rust #WebGPU #WebAssembly #GPUComputing #ScientificComputing #ComputationalPhysics #NumericalMethods #SoftwareEngineering #OpenSource
+
 # 2026/08/25
 
 https://www.linkedin.com/posts/benjamincommeau_rust-webgpu-webassembly-share-7498009118801141761-RHNY/?utm_source=share&utm_medium=member_desktop&rcm=ACoAACtxJGYB1ue63Kge-Z8YwDkr7dUOCr3VdCs
