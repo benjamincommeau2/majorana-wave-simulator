@@ -38,7 +38,7 @@ pub fn start() -> Result<(), JsValue> { // Defines the startup function and says
 
     let (device, queue) = gpu::gpu_context::request_device_and_queue(&adapter).await; // Delegates WebGPU device and queue creation to the explicitly named GPU context module.
 
-    let apply_j_shader = gpu::shaders::create_apply_j_shader(&device); // Creates the WGSL shader module and keeps its handle so the compute pipeline can use it.
+    let apply_j_shader = gpu::shader_modules::create_apply_j_shader(&device); // Creates the WGSL shader module through the clearly named shader-module helper.
 
     let apply_j_pipeline = gpu::pipelines::create_apply_j_pipeline( // Creates the J compute pipeline and keeps its handle so we can connect GPU resources to it.
 
