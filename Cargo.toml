@@ -28,7 +28,15 @@ wasm-bindgen = "0.2" # Adds wasm-bindgen, which lets Rust communicate with JavaS
 
 console_error_panic_hook = "0.1" # Makes Rust crash messages easier to read in the browser console.
 
-web-sys = { version = "0.3", features = ["Document", "Element", "Window"] } # Gives Rust access to browser objects like the window, page document, and HTML elements.
+web-sys = { version = "0.3", features = [ # Gives Rust access only to the browser API types currently needed by the application.
+  "Document", # Enables Rust access to the browser document.
+
+  "Element", # Enables Rust access to generic HTML elements such as the status element.
+
+  "HtmlCanvasElement", # Enables Rust to identify the dedicated canvas that future WebGPU rendering will target.
+
+  "Window", # Enables Rust access to the browser window.
+] } # Finishes the selected web-sys browser features.
 
 wgpu = "30.0" # Adds wgpu, the Rust graphics library that can use browser WebGPU when compiled to WebAssembly.
 
