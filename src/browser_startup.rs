@@ -56,7 +56,7 @@ pub fn start() -> Result<(), JsValue> { // Defines the startup function and says
 
     let buffer_size = std::mem::size_of_val(majorana_components) as wgpu::BufferAddress; // Calculates the number of bytes needed to store one four-component Majorana state on the GPU.
 
-    let (state_buffer, readback_buffer) = gpu::buffers::create_majorana_buffers(&device, buffer_size); // Creates both GPU buffers through the dedicated buffer module instead of exposing their low-level configuration here.
+    let (state_buffer, readback_buffer) = gpu::state_buffers::create_majorana_buffers(&device, buffer_size); // Creates the Majorana state and readback GPU buffers through the explicitly named state buffer module.
 
     let apply_j_bind_group = gpu::bind_groups::create_apply_j_bind_group( // Creates the resource connection between the existing state buffer and the J compute pipeline so the compute pass can use it.
 
