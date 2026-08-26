@@ -15,6 +15,7 @@ use wasm_bindgen::prelude::*; // Imports the wasm-bindgen tools required for the
 
 use wasm_bindgen_futures::spawn_local; // Imports the helper used to start asynchronous browser work without blocking the page.
 
+use wasm_bindgen::JsCast; // Imports the browser type-casting trait needed to convert a generic HTML element into an HtmlCanvasElement.
 
 #[wasm_bindgen(start)] // Tells wasm-bindgen to run the next function automatically when the WebAssembly module starts.
 
@@ -29,6 +30,10 @@ pub fn start() -> Result<(), JsValue> { // Defines the startup function and says
   let status = document.get_element_by_id("status").expect("Could not find element with id=status"); // Finds the HTML element whose id is "status" and stops if that element does not exist.
 
   status.set_text_content(Some("Rust/WASM loaded successfully.")); // Replaces the text inside the HTML status element with a success message.
+
+  let canvas = document.get_element_by_id("render-canvas").expect("Could not find element with id=render-canvas"); // Finds the dedicated browser canvas that future WebGPU rendering will target.
+
+  let _canvas = canvas.dyn_into::<web_sys::HtmlCanvasElement>().expect("Could not convert render-canvas into an HtmlCanvasElement"); // Verifies that the located browser element is actually an HTML canvas and keeps the typed handle for future rendering work.
 
   spawn_local(async move { // Starts an asynchronous Rust task where our WebGPU initialization will run.
 
