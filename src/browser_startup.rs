@@ -37,7 +37,9 @@ pub fn start() -> Result<(), JsValue> { // Defines the startup function and says
 
   spawn_local(async move { // Starts an asynchronous Rust task where our WebGPU initialization will run.
 
-    let adapter = gpu::gpu_context::request_adapter().await; // Delegates WebGPU adapter discovery to the explicitly named GPU context module.
+    let instance = gpu::gpu_context::create_instance(); // Creates the shared WebGPU instance that will later also own the rendering-surface creation step.
+
+    let adapter = gpu::gpu_context::request_adapter(&instance).await; // Requests the same WebGPU adapter as before while keeping the instance available for the future rendering surface.
 
     status.set_text_content(Some("WebGPU adapter acquired successfully.")); // Changes the webpage status only after Rust successfully receives a compatible GPU adapter.
 

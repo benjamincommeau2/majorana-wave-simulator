@@ -5,11 +5,19 @@ This module keeps GPU-discovery boilerplate out of `lib.rs` so the main
 application file can focus on the simulator's high-level execution flow.
 */
 
-pub async fn request_adapter() -> wgpu::Adapter { // Finds and returns a WebGPU adapter that the simulator can use.
+pub fn create_instance() -> wgpu::Instance { // Creates and returns wgpu's main entry point so later GPU setup steps can share the same instance.
 
-  let instance = wgpu::Instance::default(); // Creates wgpu's main entry point for discovering available GPU hardware.
+  wgpu::Instance::default() // Creates the WebGPU instance that will later create the rendering surface and request the adapter.
 
-  instance.request_adapter(&wgpu::RequestAdapterOptions::default()).await.expect("Could not find a compatible GPU adapter") // Requests a compatible adapter and returns it when successful.
+} // Closes the WebGPU instance-creation helper.
+
+pub async fn request_adapter( // Finds and returns a WebGPU adapter using an already-created instance.
+
+  instance: &wgpu::Instance, // Borrows the shared WebGPU instance instead of creating a hidden instance inside this helper.
+
+) -> wgpu::Adapter { // Returns the compatible WebGPU adapter after the asynchronous browser request succeeds.
+
+  instance.request_adapter(&wgpu::RequestAdapterOptions::default()).await.expect("Could not find a compatible GPU adapter") // Preserves the current adapter-request behavior while allowing the caller to retain the instance for future surface creation.
 
 } // Closes the `request_adapter` helper.
 
