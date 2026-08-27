@@ -71,3 +71,28 @@ fn gaussian_initial_state_uses_first_majorana_component() {
   assert_eq!(components[3], 0.0); // Confirms the fourth Majorana component begins empty.
 
 }
+
+#[test] // Verifies that the complete spatial field can be borrowed as contiguous four-component data for future GPU upload.
+fn spatial_field_exposes_all_grid_point_components() {
+
+  let field = SpatialMajoranaField::new_centered_gaussian(16, 2.0); // Creates the same tested sixteen-cubed spatial field.
+
+  let points = field.points(); // Borrows the complete contiguous field representation that WebGPU will later upload.
+
+  assert_eq!( // Requires the exposed data to contain every spatial grid point.
+
+    points.len(), // Reads the number of exposed four-component states.
+
+    16 * 16 * 16, // Calculates the expected number of points in the cubic field.
+
+  ); // Finishes checking the exposed field length.
+
+  assert_eq!( // Requires every exposed point to retain the four-real-component Majorana representation.
+
+    points[0].len(), // Reads the component count of the first exposed grid point.
+
+    4, // Preserves exactly four real components at every spatial position.
+
+  ); // Finishes checking the exposed point representation.
+
+}

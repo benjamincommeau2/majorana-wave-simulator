@@ -90,6 +90,12 @@ impl SpatialMajoranaField { // Defines construction and read access for the thre
 
   } // Finishes returning the field size.
 
+  pub fn points(&self) -> &[[f32; 4]] { // Borrows the complete contiguous four-component spatial field for GPU upload and rendering.
+
+    &self.points // Returns the entire spatial field without copying or transferring ownership.
+
+  } // Finishes borrowing the contiguous spatial field.
+
   pub fn components_at( // Returns the four real Majorana components stored at one three-dimensional grid coordinate.
 
     &self, // Borrows the spatial field without changing it.
