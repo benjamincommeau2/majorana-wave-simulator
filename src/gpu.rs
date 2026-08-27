@@ -1,5 +1,7 @@
 pub mod gpu_context; // Makes `src/gpu/gpu_context.rs` available as the clearly named `gpu::gpu_context` module.
 
+pub mod gpu_j_readback_verification; // Keeps the pure GPU J result-verification logic available wherever browser startup is compiled and allows centralized tests to exercise it.
+
 pub mod state_buffers; // Makes the dedicated Majorana state buffer module available as `gpu::state_buffers`.
 
 pub mod shader_modules; // Makes the dedicated shader-module helper available as `gpu::shader_modules`.
@@ -11,3 +13,4 @@ pub mod bind_groups; // Makes the dedicated GPU bind-group helper available as `
 pub mod commands; // Makes the GPU command-recording module available as `gpu::commands`.
 
 pub mod development_cube; // Makes the dedicated development-cube animation module available as `gpu::development_cube`.
+

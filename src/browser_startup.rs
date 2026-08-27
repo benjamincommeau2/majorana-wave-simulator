@@ -7,8 +7,6 @@ handling out of `lib.rs` so the crate root remains easy to understand.
 
 use crate::gpu; // Gives this browser-startup module access to the crate's WebGPU modules.
 
-use crate::physics; // Gives this browser-startup module access to the CPU-side physics reference code.
-
 use crate::state; // Gives this browser-startup module access to the Majorana state type.
 
 use wasm_bindgen::prelude::*; // Imports the wasm-bindgen tools required for the browser WebAssembly startup function.
@@ -161,7 +159,7 @@ pub fn start() -> Result<(), JsValue> { // Defines the startup function and says
 
     let readback_buffer_for_callback = readback_buffer.clone(); // Clones the lightweight wgpu buffer handle so the asynchronous mapping callback can safely access the same underlying GPU buffer later.
 
-    let expected_components = physics::j::apply_j(majorana_components); // Computes the independently tested CPU J result that the GPU-transformed readback state must match.
+    let uploaded_components_for_verification = *majorana_components; // Copies the original four uploaded components so the asynchronous callback can independently verify the later GPU result.
 
     let status_for_readback = status.clone(); // Clones the browser status-element handle so the asynchronous readback callback can update the webpage later.
 
@@ -175,15 +173,19 @@ pub fn start() -> Result<(), JsValue> { // Defines the startup function and says
 
             let mapped_range = readback_buffer_for_callback.slice(..).get_mapped_range().expect("Could not access mapped readback bytes"); // Gets the mapped byte view and stops with a clear error if wgpu cannot provide access to that mapped range.
 
-            let reconstructed_state = state::MajoranaState::from_bytes(&mapped_range); // Uses our tested byte-conversion constructor to rebuild the four-component Majorana state from the GPU readback bytes.
+            if gpu::gpu_j_readback_verification::gpu_j_readback_matches_cpu_reference( // Delegates scientific result checking to the independently testable GPU J verification module.
 
-            if reconstructed_state.components() == &expected_components { // Checks whether all four values reconstructed from GPU memory exactly match the four values originally uploaded.
+              &mapped_range, // Supplies the sixteen bytes returned from the GPU readback buffer.
+
+              &uploaded_components_for_verification, // Supplies the original CPU state so the verifier can calculate the expected CPU J result.
+
+            ) { // Starts the success branch only when GPU readback exactly matches the CPU J reference.
 
               status_for_readback.set_text_content(Some("GPU J operation verified against CPU reference.")); // Reports success only after the GPU-computed J result exactly matches the independently computed CPU reference.
 
             } else { // Starts the failure branch when the four GPU-readback components do not exactly match the expected CPU components.
 
-              status_for_readback.set_text_content(Some("GPU round-trip verification failed: readback values did not match the uploaded Majorana state.")); // Shows a visible error message when the GPU data round trip changes or corrupts any component.
+              status_for_readback.set_text_content(Some("GPU J verification failed: readback values did not match the CPU J reference.")); // Reports specifically that the GPU-computed J result disagreed with the independently tested CPU reference.
 
             } // Closes the success-versus-failure comparison of the GPU readback values.
 
