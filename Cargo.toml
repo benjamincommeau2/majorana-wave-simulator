@@ -31,11 +31,15 @@ console_error_panic_hook = "0.1" # Makes Rust crash messages easier to read in t
 web-sys = { version = "0.3", features = [ # Gives Rust access only to the browser API types currently needed by the application.
   "Document", # Enables Rust access to the browser document.
 
-  "Element", # Enables Rust access to generic HTML elements such as the status element.
+  "Element", # Enables Rust access to generic HTML elements.
 
-  "HtmlCanvasElement", # Enables Rust to identify the dedicated canvas that future WebGPU rendering will target.
+  "EventTarget", # Enables browser event listeners such as mouse-down, mouse-move, and mouse-up handlers.
 
-  "Window", # Enables Rust access to the browser window.
+  "HtmlCanvasElement", # Enables Rust access to the dedicated WebGPU rendering canvas.
+
+  "MouseEvent", # Enables Rust to read mouse-button and mouse-position information while the user drags the cube.
+
+  "Window", # Enables Rust access to the browser window and animation-frame scheduling.
 ] } # Finishes the selected web-sys browser features.
 
 wgpu = "30.0" # Adds wgpu, the Rust graphics library that can use browser WebGPU when compiled to WebAssembly.

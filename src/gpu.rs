@@ -9,3 +9,5 @@ pub mod pipelines; // Makes the dedicated compute-pipeline module available as `
 pub mod bind_groups; // Makes the dedicated GPU bind-group helper available as `gpu::bind_groups`.
 
 pub mod commands; // Makes the GPU command-recording module available as `gpu::commands`.
+
+pub mod development_cube; // Makes the dedicated development-cube animation module available as `gpu::development_cube`.

@@ -1,3 +1,7 @@
+@group(0) @binding(0) // Places the cube rotation data at bind group zero and binding zero.
+
+var<uniform> rotation: vec4<f32>; // Stores the changing rotation angle in the first component of one sixteen-byte GPU uniform value.
+
 const CUBE_POINTS = array<vec3<f32>, 8>( // Stores the eight corners of a cube directly inside this first rendering shader.
   vec3<f32>(-0.7, -0.7, -0.7), // Defines the lower-left-back cube corner.
 
@@ -52,9 +56,9 @@ fn vs_main( // Begins the vertex shader used to position each cube-edge endpoint
 
   let point = CUBE_POINTS[CUBE_EDGES[vertex_index]]; // Selects the cube corner required for this line endpoint.
 
-  let y_angle = 0.65; // Gives the cube an initial rotation around the vertical axis so its depth is visible.
+  let y_angle = rotation.x; // Uses the horizontal mouse-drag angle to rotate the cube around its vertical axis.
 
-  let x_angle = 0.45; // Gives the cube an initial rotation around the horizontal axis.
+  let x_angle = rotation.y; // Uses the vertical mouse-drag angle to rotate the cube around its horizontal axis.
 
   let rotated_y = vec3<f32>( // Applies the fixed vertical-axis rotation to the selected cube point.
     point.x * cos(y_angle) + point.z * sin(y_angle), // Computes the rotated horizontal coordinate.

@@ -103,112 +103,6 @@ pub fn start() -> Result<(), JsValue> { // Defines the startup function and says
 
         #[cfg(target_arch = "wasm32")] // Includes this first visible rendering checkpoint only in the browser WebAssembly build.
 
-    let surface_texture = match surface.get_current_texture() { // Requests the next image that WebGPU can render and present inside the browser canvas.
-
-      wgpu::CurrentSurfaceTexture::Success(texture) => texture, // Uses the acquired texture when the surface reports a normal successful frame.
-
-      wgpu::CurrentSurfaceTexture::Suboptimal(texture) => texture, // Still uses the frame if WebGPU says the surface works but may eventually benefit from reconfiguration.
-
-      surface_error => panic!("Could not acquire WebGPU surface texture: {surface_error:?}"), // Stops clearly if the browser cannot provide a renderable frame.
-
-    }; // Finishes selecting the surface texture that will become our visible frame.
-
-    #[cfg(target_arch = "wasm32")] // Includes creation of the renderable texture view only in the browser build.
-
-    let surface_view = surface_texture.texture.create_view( // Creates the view that a WebGPU render pass can use as its color output.
-
-      &wgpu::TextureViewDescriptor::default(), // Uses the default view of the complete surface texture for this first rendering checkpoint.
-
-    ); // Finishes creating the render-target view.
-
-    #[cfg(target_arch = "wasm32")] // Includes this rendering command encoder only in the browser build.
-
-    let mut render_encoder = device.create_command_encoder( // Creates a command encoder that will record our first visible rendering commands.
-
-      &wgpu::CommandEncoderDescriptor { // Starts the descriptor for the rendering command encoder.
-
-        label: Some("First Visible Render Encoder"), // Gives the encoder a clear debugging name.
-
-      }, // Finishes the rendering command-encoder descriptor.
-
-    ); // Finishes creating the rendering command encoder.
-
-    #[cfg(target_arch = "wasm32")] // Includes the render pass only in the browser WebAssembly build.
-
-    { // Starts a scope so the render pass ends before the command encoder is submitted.
-
-      let mut render_pass = render_encoder.begin_render_pass( // Begins the render pass and keeps mutable access so we can issue cube drawing commands.
-
-        &wgpu::RenderPassDescriptor { // Starts the description of the render pass.
-
-          label: Some("Canvas Clear Render Pass"), // Gives this first visual render pass a readable debugging name.
-
-          color_attachments: &[ // Starts the list of color outputs written by this render pass.
-
-            Some(wgpu::RenderPassColorAttachment { // Connects the browser surface texture as the color output.
-
-              view: &surface_view, // Selects the surface texture view as the destination for rendered pixels.
-
-              depth_slice: None, // Uses no three-dimensional texture depth slice because the browser canvas is a normal two-dimensional surface.
-
-              resolve_target: None, // Uses no multisample resolve target for this simple first frame.
-
-              ops: wgpu::Operations { // Defines what should happen to the canvas pixels during this render pass.
-
-                load: wgpu::LoadOp::Clear( // Tells WebGPU to replace the entire canvas with one known color.
-
-                  wgpu::Color { // Defines the clear color that will make GPU rendering visibly obvious.
-
-                    r: 0.08, // Sets a small red component.
-
-                    g: 0.12, // Sets a slightly larger green component.
-
-                    b: 0.20, // Sets the strongest blue component.
-
-                    a: 1.0, // Makes the rendered frame fully opaque.
-
-                  }, // Finishes the clear color.
-
-                ), // Finishes the clear operation.
-
-                store: wgpu::StoreOp::Store, // Keeps the cleared pixels so they can be presented to the browser.
-
-              }, // Finishes the color operations.
-
-            }), // Finishes the browser-canvas color attachment.
-
-          ], // Finishes the color-attachment list.
-
-          depth_stencil_attachment: None, // Uses no depth buffer yet because we are not drawing three-dimensional geometry yet.
-
-          timestamp_writes: None, // Keeps GPU timing measurements disabled for this correctness checkpoint.
-
-          occlusion_query_set: None, // Uses no visibility-query system for this simple clear operation.
-
-          multiview_mask: None, // Uses ordinary single-view rendering rather than multiview rendering.
-
-        }, // Finishes the render-pass descriptor.
-
-      ); // Finishes beginning the render pass.
-
-      render_pass.set_pipeline(&development_cube_pipeline); // Selects the development-cube rendering pipeline for this render pass.
-
-      render_pass.draw(0..24, 0..1); // Launches twenty-four shader-generated vertices, producing the cube's twelve line segments.
-
-    } // Ends the render pass before command submission.
-
-    #[cfg(target_arch = "wasm32")] // Includes submission of the visible frame only in the browser build.
-
-    queue.submit( // Sends the recorded rendering commands to the GPU.
-
-      Some(render_encoder.finish()), // Finishes the encoder and submits its completed command buffer.
-
-    ); // Finishes submitting the first rendering commands.
-
-    #[cfg(target_arch = "wasm32")] // Includes browser presentation only in the WebAssembly build.
-
-    queue.present(surface_texture); // Presents the GPU-rendered surface texture so the clear color becomes visible inside the HTML canvas.
-
     status.set_text_content(Some("WebGPU device and queue created successfully.")); // Updates the page only after Rust successfully creates the GPU device and command queue.
 
     let majorana_state = state::MajoranaState::new(); // Creates the initial four-component state through our tested production `MajoranaState` API instead of duplicating the raw array here.
@@ -311,7 +205,23 @@ pub fn start() -> Result<(), JsValue> { // Defines the startup function and says
 
     ); // Finishes the `map_async` call that requested CPU-readable access to the readback buffer.
 
-    status.set_text_content(Some("Majorana state uploaded to GPU successfully.")); // Updates the webpage only after the four-component CPU state has been written into the GPU buffer.   
+    status.set_text_content(Some("Majorana state uploaded to GPU successfully.")); // Updates the webpage only after the four-component CPU state has been written into the GPU buffer.
+    
+    #[cfg(target_arch = "wasm32")] // Starts the visual development-cube animation only in the browser WebAssembly build.
+
+      gpu::development_cube::start_mouse_rotation( // Starts the development cube with click-hold-drag rotation instead of automatic spinning.
+
+      _render_canvas, // Gives the interaction module ownership of the browser canvas so it can listen for mouse dragging.
+
+      surface, // Gives the animation loop ownership of the configured browser rendering surface.
+
+      device, // Gives the animation loop ownership of the existing WebGPU device.
+
+      queue, // Gives the animation loop ownership of the existing WebGPU queue.
+
+      development_cube_pipeline, // Gives the animation loop ownership of the already-created cube rendering pipeline.
+
+    ); // Finishes starting the continuously rotating development cube.
 
   }); // Closes the async block and finishes the spawn_local function call.
 
