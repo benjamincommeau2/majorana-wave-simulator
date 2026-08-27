@@ -1,3 +1,87 @@
+# 2026/08/27
+
+https://www.linkedin.com/posts/benjamincommeau_rust-webgpu-webassembly-share-7498797625903661058-PaZ7/?utm_source=share&utm_medium=member_desktop&rcm=ACoAACtxJGYB1ue63Kge-Z8YwDkr7dUOCr3VdCs
+
+Majorana WebGPU Simulator: Runtime-Verified GPU Physics + Interactive 3D Rendering
+
+Repo: https://github.com/benjamincommeau2/majorana-wave-simulator
+
+Live demo: https://benjamincommeau2.github.io/majorana-wave-simulator/
+
+Since my last update, I closed an important correctness checkpoint and added the first interactive 3D rendering path.
+
+The GPU implementation of
+
+J = iY ⊗ I
+
+with
+
+(a, b, c, d) → (c, d, -a, -b)
+
+is now verified at runtime in the browser.
+
+The full path is:
+
+MajoranaState
+→ upload to GPU
+→ WGSL compute shader applies J
+→ GPU readback
+→ reconstruct Rust state
+→ compare against CPU reference
+
+The browser now reports:
+
+GPU J operation verified against CPU reference.
+
+That distinction matters: a successful build is not the same as observing that the GPU computation actually produces the expected result.
+
+Current verification:
+
+→ 6 Rust tests passed
+→ Trunk/WebAssembly build passed
+→ GPU J path verified in the browser
+
+I also built the first rendering infrastructure:
+
+Rust/WASM
+→ wgpu
+→ browser canvas
+→ WebGPU surface
+→ render pipeline
+→ WGSL vertex + fragment shaders
+→ interactive 3D wireframe cube
+
+The cube can be rotated by clicking and dragging.
+
+Importantly, the cube is only a rendering-development test. It is not being presented as a Majorana wavefunction or physics visualization before that functionality exists.
+
+The actual simulator still needs the spatial grid, spectral derivative machinery, mass profile, generator application, propagation, numerical validation, and eventually a visualization backed by real simulation data.
+
+This stage also reinforced why I am treating comprehensibility as an engineering requirement. Browser startup, GPU compute, input handling, rendering, and physics are being separated into clearly named modules rather than allowed to accumulate in one large file.
+
+The development rule remains:
+
+GREEN → small change → tests/build/runtime verification → GREEN
+
+Next: refactor the new rendering code into smaller responsibilities, then continue toward the spatial Majorana simulation.
+
+Long-term direction:
+
+real 4-component Majorana state
+→ J-based spectral formulation
+→ SLAC/Fourier-pseudospectral derivatives
+→ spatially varying mass barriers
+→ norm-preserving propagation
+→ CPU/GPU validation
+→ physics-backed visualization
+
+If your team works in Rust, GPU computing, WebAssembly, numerical methods, scientific software, simulation, or computational physics, I’d appreciate a referral or introduction to a suitable role.
+
+AI-assisted drafting. I reviewed the technical content and wording before publishing.
+
+#Rust #WebGPU #WebAssembly #GPUComputing #ScientificComputing #ComputationalPhysics #SoftwareEngineering #OpenSource
+
+
 # 2026/08/26
 
 https://www.linkedin.com/posts/benjamincommeau_github-benjamincommeau2majorana-wave-simulator-activity-7498416508033835008-abZz?utm_source=share&utm_medium=member_desktop&rcm=ACoAACtxJGYB1ue63Kge-Z8YwDkr7dUOCr3VdCs
