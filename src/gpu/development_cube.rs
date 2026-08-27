@@ -1,3 +1,11 @@
+#[cfg(target_arch = "wasm32")] // Includes browser mouse-rotation support only when compiling for WebAssembly.
+
+mod mouse_drag_rotation; // Keeps development-cube mouse interaction in a separately named module.
+
+#[cfg(target_arch = "wasm32")] // Includes one-frame development-cube rendering only in the browser build.
+
+mod render_development_cube_frame; // Keeps the GPU commands for rendering one cube frame in a separately named module.
+
 #[cfg(target_arch = "wasm32")] // Includes browser animation support only when compiling for WebAssembly.
 
 use std::cell::RefCell; // Provides interior mutability so the animation callback can store a reference to itself.
@@ -13,22 +21,6 @@ use wasm_bindgen::closure::Closure; // Wraps our Rust animation function so the 
 #[cfg(target_arch = "wasm32")] // Includes browser type-casting support only in the WebAssembly build.
 
 use wasm_bindgen::JsCast; // Lets the Rust Closure be supplied where requestAnimationFrame expects a JavaScript function.
-
-#[cfg(target_arch = "wasm32")] // Includes the mouse-drag state only in the browser build.
-
-struct CubeDragState { // Stores the small amount of browser interaction state needed to rotate the development cube.
-
-  yaw: f32, // Stores the current left-right rotation angle.
-
-  pitch: f32, // Stores the current up-down rotation angle.
-
-  dragging: bool, // Records whether the mouse button is currently being held down for cube rotation.
-
-  last_x: i32, // Stores the previous horizontal mouse position using the same integer pixel type returned by MouseEvent::client_x.
-
-  last_y: i32, // Stores the previous vertical mouse position using the same integer pixel type returned by MouseEvent::client_y.
-
-} // Finishes the mouse-drag state type.
 
 #[cfg(target_arch = "wasm32")] // Builds this animation function only for the browser target.
 
@@ -88,99 +80,11 @@ pub fn start_mouse_rotation( // Starts the development-cube renderer whose orien
 
   ); // Finishes creating the rotation bind group.
 
-  let drag_state = Rc::new(RefCell::new( // Creates shared mouse state that can be accessed by all three browser mouse callbacks.
+  let drag_state = mouse_drag_rotation::attach_mouse_drag_rotation( // Delegates browser mouse interaction to the explicitly named mouse-drag module.
 
-    CubeDragState { // Starts the initial cube orientation and mouse-drag state.
+    &canvas, // Supplies the development canvas on which cube dragging is observed.
 
-      yaw: 0.65, // Starts with the same useful left-right viewing angle as the earlier static cube.
-
-      pitch: 0.45, // Starts with the same useful vertical tilt as the earlier static cube.
-
-      dragging: false, // Starts with mouse rotation disabled until the user presses the mouse button.
-
-      last_x: 0, // Initializes the previous horizontal mouse position in integer browser pixels.
-
-      last_y: 0, // Initializes the previous vertical mouse position in integer browser pixels.
-
-    }, // Finishes the initial cube-drag state.
-
-  )); // Finishes wrapping the state so several browser callbacks can share and modify it.
-
-  let drag_state_for_down = drag_state.clone(); // Gives the mouse-down callback access to the shared cube-drag state.
-
-  let mouse_down = Closure::<dyn FnMut(web_sys::MouseEvent)>::new(move |event: web_sys::MouseEvent| { // Starts the callback that activates cube rotation when the user presses the mouse button.
-
-    let mut state = drag_state_for_down.borrow_mut(); // Borrows the shared drag state mutably so this callback can update it.
-
-    state.dragging = true; // Marks the cube as actively being dragged.
-
-    state.last_x = event.client_x(); // Remembers where the horizontal drag started.
-
-    state.last_y = event.client_y(); // Remembers where the vertical drag started.
-
-  }); // Finishes the mouse-down callback.
-
-  canvas.add_event_listener_with_callback( // Registers the mouse-down callback on the cube canvas.
-
-    "mousedown", // Runs this callback whenever the mouse button is pressed over the canvas.
-
-    mouse_down.as_ref().unchecked_ref(), // Converts the Rust closure into the JavaScript callback type expected by the browser.
-
-  ).expect("Could not register cube mousedown listener"); // Stops clearly if the browser cannot register the mouse-down handler.
-
-  mouse_down.forget(); // Keeps the mouse-down callback alive for the lifetime of this browser page.
-
-  let drag_state_for_move = drag_state.clone(); // Gives the mouse-move callback access to the same shared cube orientation.
-
-  let mouse_move = Closure::<dyn FnMut(web_sys::MouseEvent)>::new(move |event: web_sys::MouseEvent| { // Starts the callback that changes the cube angles while the mouse is dragged.
-
-    let mut state = drag_state_for_move.borrow_mut(); // Borrows the current cube-drag state so the movement can update its angles.
-
-    if state.dragging { // Changes the cube orientation only while the mouse button is being held.
-
-      let delta_x = (event.client_x() - state.last_x) as f32; // Measures how far the mouse moved horizontally since the previous event.
-
-      let delta_y = (event.client_y() - state.last_y) as f32; // Measures how far the mouse moved vertically since the previous event.
-
-      state.yaw += delta_x * 0.01; // Converts horizontal mouse movement into left-right cube rotation.
-
-      state.pitch = (state.pitch + delta_y * 0.01).clamp(-1.4, 1.4); // Converts vertical movement into tilt while preventing the cube from flipping completely over.
-
-      state.last_x = event.client_x(); // Saves the current horizontal position for the next movement event.
-
-      state.last_y = event.client_y(); // Saves the current vertical position for the next movement event.
-
-    } // Finishes the active-drag check.
-
-  }); // Finishes the mouse-move callback.
-
-  canvas.add_event_listener_with_callback( // Registers mouse movement directly on the cube canvas.
-
-    "mousemove", // Runs this callback whenever the pointer moves across the canvas.
-
-    mouse_move.as_ref().unchecked_ref(), // Converts the Rust mouse-move closure into a browser callback.
-
-  ).expect("Could not register cube mousemove listener"); // Stops clearly if the movement listener cannot be registered.
-
-  mouse_move.forget(); // Keeps the mouse-move callback alive for the lifetime of the page.
-
-  let drag_state_for_up = drag_state.clone(); // Gives the mouse-up callback access to the shared dragging flag.
-
-  let mouse_up = Closure::<dyn FnMut(web_sys::MouseEvent)>::new(move |_event: web_sys::MouseEvent| { // Starts the callback that stops cube rotation when the mouse button is released.
-
-    drag_state_for_up.borrow_mut().dragging = false; // Stops applying mouse movement to the cube orientation.
-
-  }); // Finishes the mouse-up callback.
-
-  web_sys::window().expect("Could not get browser window for cube mouseup listener").add_event_listener_with_callback( // Registers mouse-up on the whole window so releasing outside the canvas still ends the drag.
-
-    "mouseup", // Runs whenever the pressed mouse button is released.
-
-    mouse_up.as_ref().unchecked_ref(), // Converts the Rust mouse-up closure into the browser callback type.
-
-  ).expect("Could not register cube mouseup listener"); // Stops clearly if the browser cannot register the mouse-release handler.
-
-  mouse_up.forget(); // Keeps the mouse-up callback alive for the lifetime of the page.
+  ); // Finishes creating the shared mouse-controlled rotation state.
 
   let animation_callback: Rc<RefCell<Option<Closure<dyn FnMut(f64)>>>> = Rc::new(RefCell::new(None)); // Creates explicitly typed shared storage for the repeating browser animation callback so Rust knows what value the initially empty Option will later contain.
 
@@ -190,15 +94,17 @@ pub fn start_mouse_rotation( // Starts the development-cube renderer whose orien
 
     Closure::<dyn FnMut(f64)>::new(move |_timestamp_ms: f64| { // Runs once per browser frame while intentionally ignoring time because the cube orientation now comes from mouse input.
 
-      let rotation_values = { // Copies the current mouse-controlled orientation into a four-f32 value suitable for the existing GPU uniform buffer.
+      let rotation_values = { // Copies the current mouse-controlled orientation into the four-f32 GPU uniform.
 
-        let state = drag_state.borrow(); // Reads the latest yaw and pitch written by the browser mouse callbacks.
+        let state = drag_state.borrow(); // Reads the latest mouse-controlled rotation state.
+
+        let [yaw, pitch] = state.angles(); // Requests only the two angles that the renderer needs from the mouse-interaction module.
 
         [ // Starts the sixteen-byte uniform value sent to WGSL.
 
-          state.yaw, // Sends the current horizontal rotation angle to rotation.x.
+          yaw, // Sends the horizontal rotation angle to rotation.x.
 
-          state.pitch, // Sends the current vertical rotation angle to rotation.y.
+          pitch, // Sends the vertical rotation angle to rotation.y.
 
           0.0, // Leaves the third uniform component unused.
 
@@ -208,121 +114,23 @@ pub fn start_mouse_rotation( // Starts the development-cube renderer whose orien
 
       }; // Finishes copying the mouse-controlled angles.
 
-      queue.write_buffer( // Updates the GPU rotation value before drawing this frame.
+      render_development_cube_frame::render_development_cube_frame( // Delegates all GPU work for this single frame to the explicitly named frame-rendering module.
 
-        &rotation_buffer, // Selects the small cube rotation uniform buffer.
+        &surface, // Supplies the configured browser surface that receives the rendered frame.
 
-        0, // Starts writing at the beginning of the uniform buffer.
+        &device, // Supplies the WebGPU device used to create this frame's command encoder.
 
-        bytemuck::cast_slice(&rotation_values), // Reinterprets the four f32 values as the sixteen bytes required by the GPU buffer.
+        &queue, // Supplies the queue used for the uniform update, GPU submission, and presentation.
 
-      ); // Finishes uploading the current rotation angle.
+        &pipeline, // Supplies the existing development-cube rendering pipeline.
 
-      let surface_texture = match surface.get_current_texture() { // Acquires the browser surface image that this animation frame will render into.
+        &rotation_buffer, // Supplies the uniform buffer containing the cube orientation.
 
-        wgpu::CurrentSurfaceTexture::Success(texture) => texture, // Uses the frame when WebGPU reports normal successful acquisition.
+        &rotation_bind_group, // Supplies the bind group that exposes the rotation uniform to WGSL.
 
-        wgpu::CurrentSurfaceTexture::Suboptimal(texture) => texture, // Still uses a valid frame when the surface reports that reconfiguration may eventually be useful.
+        &rotation_values, // Supplies the current mouse-controlled yaw and pitch values.
 
-        surface_error => panic!("Could not acquire cube animation surface texture: {surface_error:?}"), // Stops clearly if a renderable browser frame cannot be acquired.
-
-      }; // Finishes acquiring this animation frame's surface texture.
-
-      let surface_view = surface_texture.texture.create_view( // Creates the texture view that the render pass will use as its color output.
-
-        &wgpu::TextureViewDescriptor::default(), // Uses the complete surface texture with its default view configuration.
-
-      ); // Finishes creating the animation-frame texture view.
-
-      let mut encoder = device.create_command_encoder( // Creates the command encoder used to record this animation frame.
-
-        &wgpu::CommandEncoderDescriptor { // Starts the per-frame command-encoder description.
-
-          label: Some("Development Cube Animation Encoder"), // Gives the animation encoder a readable debugging label.
-
-        }, // Finishes the command-encoder description.
-
-      ); // Finishes creating the per-frame encoder.
-
-      { // Starts a short scope so the render pass ends before command submission.
-
-        let mut render_pass = encoder.begin_render_pass( // Begins recording the commands that draw this cube frame.
-
-          &wgpu::RenderPassDescriptor { // Starts the animation render-pass description.
-
-            label: Some("Development Cube Animation Pass"), // Gives the repeating render pass a readable debugging name.
-
-            color_attachments: &[ // Starts the list of render targets for this frame.
-
-              Some(wgpu::RenderPassColorAttachment { // Uses the browser surface as the single color output.
-
-                view: &surface_view, // Directs rendered pixels into the current browser surface texture.
-
-                depth_slice: None, // Uses no three-dimensional texture slice because the canvas surface is two-dimensional.
-
-                resolve_target: None, // Uses no multisampling resolve texture for this wireframe preview.
-
-                ops: wgpu::Operations { // Describes how the existing surface pixels are handled.
-
-                  load: wgpu::LoadOp::Clear( // Clears the entire frame before drawing the newly rotated cube.
-
-                    wgpu::Color { // Reuses the dark development background color.
-
-                      r: 0.08, // Sets the red background component.
-
-                      g: 0.12, // Sets the green background component.
-
-                      b: 0.20, // Sets the blue background component.
-
-                      a: 1.0, // Keeps the background fully opaque.
-
-                    }, // Finishes the background color.
-
-                  ), // Finishes the clear operation.
-
-                  store: wgpu::StoreOp::Store, // Preserves the completed frame so it can be presented to the browser.
-
-                }, // Finishes the surface color operations.
-
-              }), // Finishes the browser color attachment.
-
-            ], // Finishes the color-target list.
-
-            depth_stencil_attachment: None, // Keeps depth buffering disabled for the current wireframe cube.
-
-            timestamp_writes: None, // Keeps GPU timing instrumentation disabled while establishing animation correctness.
-
-            occlusion_query_set: None, // Uses no visibility-query system for this simple development renderer.
-
-            multiview_mask: None, // Uses one ordinary browser view.
-
-          }, // Finishes the render-pass description.
-
-        ); // Finishes beginning the animation render pass.
-
-        render_pass.set_pipeline(&pipeline); // Selects the existing development-cube rendering pipeline.
-
-        render_pass.set_bind_group( // Supplies the changing rotation uniform required by the cube shader.
-
-          0, // Connects the resource to shader bind group zero.
-
-          &rotation_bind_group, // Supplies the bind group containing the rotation uniform buffer.
-
-          &[], // Uses no dynamic buffer offsets.
-
-        ); // Finishes binding the cube rotation data.
-
-        render_pass.draw(0..24, 0..1); // Draws the same twelve cube edges using the new orientation for this frame.
-
-      } // Ends the animation render pass before submission.
-
-      queue.submit( // Sends this completed animation frame to the GPU.
-
-        Some(encoder.finish()), // Finishes the command encoder and submits its command buffer.
-
-      ); // Finishes submitting the frame.
-
-      queue.present(surface_texture); // Presents the completed frame inside the browser canvas.
+      ); // Finishes rendering this development-cube frame.
 
       let window = web_sys::window().expect("Could not get browser window for cube animation"); // Gets the browser Window needed to request the next frame.
 
