@@ -1,6 +1,6 @@
-#[cfg(target_arch = "wasm32")] // Includes browser mouse-rotation support only when compiling for WebAssembly.
+#[cfg(any(target_arch = "wasm32", test))] // Compiles mouse rotation for the browser and for native unit tests, but not for unused ordinary native builds.
 
-mod mouse_drag_rotation; // Keeps development-cube mouse interaction in a separately named module.
+mod mouse_drag_rotation; // Keeps mouse interaction private while allowing its deterministic behavior to be unit tested.
 
 #[cfg(target_arch = "wasm32")] // Includes one-frame development-cube rendering only in the browser build.
 

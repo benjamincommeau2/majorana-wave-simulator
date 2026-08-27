@@ -1,10 +1,18 @@
 // src/gpu/development_cube/mouse_drag_rotation.rs
 
+#[cfg(target_arch = "wasm32")] // Includes this browser-only dependency only when compiling the WebAssembly application.
+
 use std::cell::RefCell; // Provides interior mutability so several browser callbacks can update the same mouse-drag state.
+
+#[cfg(target_arch = "wasm32")] // Includes this browser-only dependency only when compiling the WebAssembly application.
 
 use std::rc::Rc; // Lets the browser callbacks and renderer share ownership of the mouse-drag state.
 
+#[cfg(target_arch = "wasm32")] // Includes this browser-only dependency only when compiling the WebAssembly application.
+
 use wasm_bindgen::closure::Closure; // Wraps Rust mouse-event functions so the browser can call them.
+
+#[cfg(target_arch = "wasm32")] // Includes this browser-only dependency only when compiling the WebAssembly application.
 
 use wasm_bindgen::JsCast; // Converts Rust closures into the JavaScript callback type expected by browser event listeners.
 
@@ -22,9 +30,63 @@ pub(super) struct MouseDragRotation { // Stores the browser interaction state th
 
 } // Finishes the mouse-drag rotation state.
 
-impl MouseDragRotation { // Defines the small public interface needed by the development-cube renderer.
+impl MouseDragRotation { // Defines the mouse-rotation behavior independently from browser event objects.
 
-  pub(super) fn angles(&self) -> [f32; 2] { // Returns only the two rotation values that the renderer needs.
+  fn new() -> Self { // Creates the initial development-cube orientation and inactive drag state.
+
+    Self { // Starts the initial mouse-rotation state.
+
+      yaw: 0.65, // Starts with the established left-right viewing angle.
+
+      pitch: 0.45, // Starts with the established vertical viewing angle.
+
+      dragging: false, // Starts with mouse dragging inactive.
+
+      last_x: 0, // Initializes the previous horizontal mouse position.
+
+      last_y: 0, // Initializes the previous vertical mouse position.
+
+    } // Finishes the initial mouse-rotation state.
+
+  } // Finishes creating the initial state.
+
+  fn start_drag(&mut self, x: i32, y: i32) { // Begins a drag from the supplied browser-pixel position.
+
+    self.dragging = true; // Marks subsequent pointer movement as cube rotation.
+
+    self.last_x = x; // Remembers the horizontal starting position.
+
+    self.last_y = y; // Remembers the vertical starting position.
+
+  } // Finishes starting a drag.
+
+  fn drag_to(&mut self, x: i32, y: i32) { // Applies pointer movement to the cube orientation while dragging is active.
+
+    if self.dragging { // Ignores pointer movement when the mouse button is not being held.
+
+      let delta_x = (x - self.last_x) as f32; // Measures horizontal movement since the previous drag position.
+
+      let delta_y = (y - self.last_y) as f32; // Measures vertical movement since the previous drag position.
+
+      self.yaw += delta_x * 0.01; // Converts horizontal movement into left-right rotation.
+
+      self.pitch = (self.pitch + delta_y * 0.01).clamp(-1.4, 1.4); // Converts vertical movement into tilt while preserving the existing pitch limits.
+
+      self.last_x = x; // Saves the current horizontal position for the next drag update.
+
+      self.last_y = y; // Saves the current vertical position for the next drag update.
+
+    } // Finishes the active-drag check.
+
+  } // Finishes applying drag movement.
+
+  fn stop_drag(&mut self) { // Ends the active mouse drag.
+
+    self.dragging = false; // Prevents later pointer movement from rotating the cube until another drag starts.
+
+  } // Finishes stopping the drag.
+
+  pub(super) fn angles(&self) -> [f32; 2] { // Returns only the orientation values required by the renderer.
 
     [ // Starts the two-angle result.
 
@@ -38,41 +100,31 @@ impl MouseDragRotation { // Defines the small public interface needed by the dev
 
 } // Finishes the mouse-drag rotation implementation.
 
+#[cfg(target_arch = "wasm32")] // Connects the tested mouse-rotation state to real browser mouse events only in the WebAssembly build.
+
 pub(super) fn attach_mouse_drag_rotation( // Registers the browser mouse listeners and returns their shared rotation state.
 
   canvas: &web_sys::HtmlCanvasElement, // Borrows the development canvas on which mouse-down and mouse-move events are observed.
 
 ) -> Rc<RefCell<MouseDragRotation>> { // Returns shared state so the render loop can read the current yaw and pitch.
 
-  let drag_state = Rc::new(RefCell::new( // Creates shared mutable mouse state for the event callbacks and renderer.
+  let drag_state = Rc::new(RefCell::new( // Creates shared ownership of the tested mouse-rotation state for the browser callbacks and renderer.
 
-    MouseDragRotation { // Starts the initial development-cube orientation.
+    MouseDragRotation::new(), // Uses the same tested initialization logic instead of duplicating the initial values here.
 
-      yaw: 0.65, // Starts with the existing useful left-right viewing angle.
-
-      pitch: 0.45, // Starts with the existing useful vertical tilt.
-
-      dragging: false, // Starts with rotation inactive until the mouse button is pressed.
-
-      last_x: 0, // Initializes the previous horizontal mouse position.
-
-      last_y: 0, // Initializes the previous vertical mouse position.
-
-    }, // Finishes the initial mouse-drag state.
-
-  )); // Finishes creating the shared mouse-drag state.
+  )); // Finishes creating the shared mouse-rotation state.
 
   let drag_state_for_down = drag_state.clone(); // Gives the mouse-down callback access to the shared drag state.
 
   let mouse_down = Closure::<dyn FnMut(web_sys::MouseEvent)>::new(move |event: web_sys::MouseEvent| { // Starts dragging when the user presses the mouse button over the canvas.
 
-    let mut state = drag_state_for_down.borrow_mut(); // Borrows the shared state so the callback can update it.
+    drag_state_for_down.borrow_mut().start_drag( // Delegates drag initialization to the testable Rust state behavior.
 
-    state.dragging = true; // Marks the cube as actively being dragged.
+      event.client_x(), // Supplies the browser's current horizontal mouse position.
 
-    state.last_x = event.client_x(); // Remembers the horizontal position where this drag event begins.
+      event.client_y(), // Supplies the browser's current vertical mouse position.
 
-    state.last_y = event.client_y(); // Remembers the vertical position where this drag event begins.
+    ); // Finishes starting the drag.
 
   }); // Finishes the mouse-down callback.
 
@@ -90,24 +142,14 @@ pub(super) fn attach_mouse_drag_rotation( // Registers the browser mouse listene
 
   let mouse_move = Closure::<dyn FnMut(web_sys::MouseEvent)>::new(move |event: web_sys::MouseEvent| { // Updates cube rotation while the mouse is dragged.
 
-    let mut state = drag_state_for_move.borrow_mut(); // Borrows the shared drag state so the angles can be changed.
+    drag_state_for_move.borrow_mut().drag_to( // Delegates movement arithmetic and pitch clamping to the testable Rust state behavior.
 
-    if state.dragging { // Changes orientation only while the mouse button is being held.
+      event.client_x(), // Supplies the new horizontal mouse position.
 
-      let delta_x = (event.client_x() - state.last_x) as f32; // Measures horizontal mouse movement since the previous event.
+      event.client_y(), // Supplies the new vertical mouse position.
 
-      let delta_y = (event.client_y() - state.last_y) as f32; // Measures vertical mouse movement since the previous event.
-
-      state.yaw += delta_x * 0.01; // Converts horizontal movement into left-right cube rotation.
-
-      state.pitch = (state.pitch + delta_y * 0.01).clamp(-1.4, 1.4); // Converts vertical movement into tilt while preventing a complete flip.
-
-      state.last_x = event.client_x(); // Saves the current horizontal position for the next movement event.
-
-      state.last_y = event.client_y(); // Saves the current vertical position for the next movement event.
-
-    } // Finishes the active-drag check.
-
+    ); // Finishes applying this drag movement.
+    
   }); // Finishes the mouse-move callback.
 
   canvas.add_event_listener_with_callback( // Registers mouse movement directly on the development canvas.
@@ -124,7 +166,7 @@ pub(super) fn attach_mouse_drag_rotation( // Registers the browser mouse listene
 
   let mouse_up = Closure::<dyn FnMut(web_sys::MouseEvent)>::new(move |_event: web_sys::MouseEvent| { // Stops dragging when the mouse button is released.
 
-    drag_state_for_up.borrow_mut().dragging = false; // Prevents further mouse movement from changing the cube orientation.
+    drag_state_for_up.borrow_mut().stop_drag(); // Delegates drag termination to the testable Rust state behavior.
 
   }); // Finishes the mouse-up callback.
 
@@ -141,3 +183,9 @@ pub(super) fn attach_mouse_drag_rotation( // Registers the browser mouse listene
   drag_state // Returns the shared rotation state so the render loop can read its current angles.
 
 } // Finishes registering development-cube mouse rotation.
+
+#[cfg(test)] // Includes the centralized mouse-rotation unit tests only while running cargo test.
+
+#[path = "../../../tests/unit/mouse_drag_rotation_tests.rs"] // Keeps the test source physically centralized under the repository's tests directory.
+
+mod mouse_drag_rotation_tests; // Attaches the centralized tests as a child module so they can verify private rotation behavior.
