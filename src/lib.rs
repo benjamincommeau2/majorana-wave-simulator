@@ -12,4 +12,7 @@ pub mod gpu; // Makes the WebGPU modules available through the crate's public AP
 
 pub mod physics; // Makes the CPU-side physics modules available through the crate's public API.
 
+pub mod spatial_majorana_field; // Makes the three-dimensional Majorana field representation available to the simulator and its tests.
+
 mod browser_startup; // Includes the browser and WebAssembly startup module in the compiled application.
+
