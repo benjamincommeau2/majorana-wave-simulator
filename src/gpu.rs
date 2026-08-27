@@ -6,6 +6,8 @@ pub mod start_gpu_j_runtime_verification; // Keeps the complete GPU J dispatch/r
 
 pub mod state_buffers; // Makes the dedicated Majorana state buffer module available as `gpu::state_buffers`.
 
+pub mod spatial_majorana_field_buffer; // Exposes the explicitly named GPU buffer helper for the complete three-dimensional Majorana field.
+
 pub mod shader_modules; // Makes the dedicated shader-module helper available as `gpu::shader_modules`.
 
 pub mod pipelines; // Makes the dedicated compute-pipeline module available as `gpu::pipelines`.
