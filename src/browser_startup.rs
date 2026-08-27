@@ -41,7 +41,7 @@ pub fn start() -> Result<(), JsValue> { // Defines the startup function and says
 
     #[cfg(target_arch = "wasm32")] // Includes this browser-canvas surface code only when compiling the application for WebAssembly.
 
-    let _surface = instance.create_surface( // Asks the shared WebGPU instance to create a presentable rendering surface for our browser canvas.
+    let surface = instance.create_surface( // Asks the shared WebGPU instance to create a presentable rendering surface for our browser canvas.
 
       wgpu::SurfaceTarget::Canvas(_render_canvas.clone()), // Supplies the verified typed HTML canvas handle that wgpu requires for browser surface creation.
 
@@ -53,6 +53,28 @@ pub fn start() -> Result<(), JsValue> { // Defines the startup function and says
 
     let (device, queue) = gpu::gpu_context::request_device_and_queue(&adapter).await; // Delegates WebGPU device and queue creation to the explicitly named GPU context module.
 
+    #[cfg(target_arch = "wasm32")] // Includes browser-surface configuration only when compiling the application for WebAssembly.
+
+    let surface_config = surface.get_default_config( // Asks wgpu to choose a supported default presentation configuration for this surface and adapter.
+
+      &adapter, // Supplies the GPU adapter so wgpu can choose a surface format supported by that adapter.
+
+      _render_canvas.width(), // Uses the canvas's configured pixel width for the GPU presentation surface.
+
+      _render_canvas.height(), // Uses the canvas's configured pixel height for the GPU presentation surface.
+
+    ).expect("Could not create a compatible WebGPU surface configuration"); // Stops clearly if this adapter cannot present images to this canvas surface.
+
+    #[cfg(target_arch = "wasm32")] // Includes the actual surface-configuration call only in the browser WebAssembly build.
+
+    surface.configure( // Initializes the surface so future render passes can acquire presentable textures from it.
+
+      &device, // Supplies the WebGPU device that will create and submit rendering work.
+
+      &surface_config, // Supplies the supported width, height, format, and presentation settings selected above.
+
+    ); // Finishes configuring the browser rendering surface.
+
     let apply_j_shader = gpu::shader_modules::create_apply_j_shader(&device); // Creates the WGSL shader module through the clearly named shader-module helper.
 
     let apply_j_pipeline = gpu::pipelines::create_apply_j_pipeline( // Creates the J compute pipeline and keeps its handle so we can connect GPU resources to it.
@@ -62,6 +84,110 @@ pub fn start() -> Result<(), JsValue> { // Defines the startup function and says
       &apply_j_shader, // Gives the pipeline helper the already-created Apply J shader module.
 
     ); // Finishes the compute-pipeline creation call.
+
+        #[cfg(target_arch = "wasm32")] // Includes this first visible rendering checkpoint only in the browser WebAssembly build.
+
+    let surface_texture = match surface.get_current_texture() { // Requests the next image that WebGPU can render and present inside the browser canvas.
+
+      wgpu::CurrentSurfaceTexture::Success(texture) => texture, // Uses the acquired texture when the surface reports a normal successful frame.
+
+      wgpu::CurrentSurfaceTexture::Suboptimal(texture) => texture, // Still uses the frame if WebGPU says the surface works but may eventually benefit from reconfiguration.
+
+      surface_error => panic!("Could not acquire WebGPU surface texture: {surface_error:?}"), // Stops clearly if the browser cannot provide a renderable frame.
+
+    }; // Finishes selecting the surface texture that will become our visible frame.
+
+    #[cfg(target_arch = "wasm32")] // Includes creation of the renderable texture view only in the browser build.
+
+    let surface_view = surface_texture.texture.create_view( // Creates the view that a WebGPU render pass can use as its color output.
+
+      &wgpu::TextureViewDescriptor::default(), // Uses the default view of the complete surface texture for this first rendering checkpoint.
+
+    ); // Finishes creating the render-target view.
+
+    #[cfg(target_arch = "wasm32")] // Includes this rendering command encoder only in the browser build.
+
+    let mut render_encoder = device.create_command_encoder( // Creates a command encoder that will record our first visible rendering commands.
+
+      &wgpu::CommandEncoderDescriptor { // Starts the descriptor for the rendering command encoder.
+
+        label: Some("First Visible Render Encoder"), // Gives the encoder a clear debugging name.
+
+      }, // Finishes the rendering command-encoder descriptor.
+
+    ); // Finishes creating the rendering command encoder.
+
+    #[cfg(target_arch = "wasm32")] // Includes the render pass only in the browser WebAssembly build.
+
+    { // Starts a scope so the render pass ends before the command encoder is submitted.
+
+      let _render_pass = render_encoder.begin_render_pass( // Begins the first render pass that will actually write visible pixels.
+
+        &wgpu::RenderPassDescriptor { // Starts the description of the render pass.
+
+          label: Some("Canvas Clear Render Pass"), // Gives this first visual render pass a readable debugging name.
+
+          color_attachments: &[ // Starts the list of color outputs written by this render pass.
+
+            Some(wgpu::RenderPassColorAttachment { // Connects the browser surface texture as the color output.
+
+              view: &surface_view, // Selects the surface texture view as the destination for rendered pixels.
+
+              depth_slice: None, // Uses no three-dimensional texture depth slice because the browser canvas is a normal two-dimensional surface.
+
+              resolve_target: None, // Uses no multisample resolve target for this simple first frame.
+
+              ops: wgpu::Operations { // Defines what should happen to the canvas pixels during this render pass.
+
+                load: wgpu::LoadOp::Clear( // Tells WebGPU to replace the entire canvas with one known color.
+
+                  wgpu::Color { // Defines the clear color that will make GPU rendering visibly obvious.
+
+                    r: 0.08, // Sets a small red component.
+
+                    g: 0.12, // Sets a slightly larger green component.
+
+                    b: 0.20, // Sets the strongest blue component.
+
+                    a: 1.0, // Makes the rendered frame fully opaque.
+
+                  }, // Finishes the clear color.
+
+                ), // Finishes the clear operation.
+
+                store: wgpu::StoreOp::Store, // Keeps the cleared pixels so they can be presented to the browser.
+
+              }, // Finishes the color operations.
+
+            }), // Finishes the browser-canvas color attachment.
+
+          ], // Finishes the color-attachment list.
+
+          depth_stencil_attachment: None, // Uses no depth buffer yet because we are not drawing three-dimensional geometry yet.
+
+          timestamp_writes: None, // Keeps GPU timing measurements disabled for this correctness checkpoint.
+
+          occlusion_query_set: None, // Uses no visibility-query system for this simple clear operation.
+
+          multiview_mask: None, // Uses ordinary single-view rendering rather than multiview rendering.
+
+        }, // Finishes the render-pass descriptor.
+
+      ); // Finishes beginning the render pass.
+
+    } // Ends the render pass before command submission.
+
+    #[cfg(target_arch = "wasm32")] // Includes submission of the visible frame only in the browser build.
+
+    queue.submit( // Sends the recorded rendering commands to the GPU.
+
+      Some(render_encoder.finish()), // Finishes the encoder and submits its completed command buffer.
+
+    ); // Finishes submitting the first rendering commands.
+
+    #[cfg(target_arch = "wasm32")] // Includes browser presentation only in the WebAssembly build.
+
+    queue.present(surface_texture); // Presents the GPU-rendered surface texture so the clear color becomes visible inside the HTML canvas.
 
     status.set_text_content(Some("WebGPU device and queue created successfully.")); // Updates the page only after Rust successfully creates the GPU device and command queue.
 
