@@ -75,6 +75,22 @@ pub fn start() -> Result<(), JsValue> { // Defines the startup function and says
 
     ); // Finishes configuring the browser rendering surface.
 
+    #[cfg(target_arch = "wasm32")] // Includes cube-shader creation only in the browser WebAssembly build.
+
+    let development_cube_shader = gpu::shader_modules::create_development_cube_shader(&device); // Compiles the dedicated development-cube WGSL shader.
+
+    #[cfg(target_arch = "wasm32")] // Includes cube-pipeline creation only in the browser WebAssembly build.
+
+    let development_cube_pipeline = gpu::pipelines::create_development_cube_pipeline( // Creates the pipeline that will turn shader-generated vertices into visible cube edges.
+
+      &device, // Supplies the existing WebGPU device.
+
+      &development_cube_shader, // Supplies the compiled development-cube shader.
+
+      surface_config.format, // Matches the cube output to the browser surface's configured pixel format.
+
+    ); // Finishes creating the cube render pipeline.
+
     let apply_j_shader = gpu::shader_modules::create_apply_j_shader(&device); // Creates the WGSL shader module through the clearly named shader-module helper.
 
     let apply_j_pipeline = gpu::pipelines::create_apply_j_pipeline( // Creates the J compute pipeline and keeps its handle so we can connect GPU resources to it.
@@ -121,7 +137,7 @@ pub fn start() -> Result<(), JsValue> { // Defines the startup function and says
 
     { // Starts a scope so the render pass ends before the command encoder is submitted.
 
-      let _render_pass = render_encoder.begin_render_pass( // Begins the first render pass that will actually write visible pixels.
+      let mut render_pass = render_encoder.begin_render_pass( // Begins the render pass and keeps mutable access so we can issue cube drawing commands.
 
         &wgpu::RenderPassDescriptor { // Starts the description of the render pass.
 
@@ -174,6 +190,10 @@ pub fn start() -> Result<(), JsValue> { // Defines the startup function and says
         }, // Finishes the render-pass descriptor.
 
       ); // Finishes beginning the render pass.
+
+      render_pass.set_pipeline(&development_cube_pipeline); // Selects the development-cube rendering pipeline for this render pass.
+
+      render_pass.draw(0..24, 0..1); // Launches twenty-four shader-generated vertices, producing the cube's twelve line segments.
 
     } // Ends the render pass before command submission.
 
