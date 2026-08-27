@@ -47,3 +47,7 @@ wgpu = "30.0" # Adds wgpu, the Rust graphics library that can use browser WebGPU
 wasm-bindgen-futures = "0.4" # Lets our browser-based Rust code wait for asynchronous operations such as requesting a GPU adapter.
 
 bytemuck = "1" # Adds safe helpers for viewing our typed f32 state as raw bytes when transferring it to WebGPU.
+
+[dev-dependencies] # Starts dependencies used only while compiling and running tests.
+
+pollster = "1.0" # Lets the native GPU integration test wait for wgpu's asynchronous adapter and device requests.
