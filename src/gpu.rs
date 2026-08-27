@@ -2,6 +2,8 @@ pub mod gpu_context; // Makes `src/gpu/gpu_context.rs` available as the clearly 
 
 pub mod gpu_j_readback_verification; // Keeps the pure GPU J result-verification logic available wherever browser startup is compiled and allows centralized tests to exercise it.
 
+pub mod start_gpu_j_runtime_verification; // Keeps the complete GPU J dispatch/readback runtime procedure out of browser startup orchestration.
+
 pub mod state_buffers; // Makes the dedicated Majorana state buffer module available as `gpu::state_buffers`.
 
 pub mod shader_modules; // Makes the dedicated shader-module helper available as `gpu::shader_modules`.
