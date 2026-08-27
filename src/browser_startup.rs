@@ -33,11 +33,19 @@ pub fn start() -> Result<(), JsValue> { // Defines the startup function and says
 
   let canvas = document.get_element_by_id("render-canvas").expect("Could not find element with id=render-canvas"); // Finds the dedicated browser canvas that future WebGPU rendering will target.
 
-  let _canvas = canvas.dyn_into::<web_sys::HtmlCanvasElement>().expect("Could not convert render-canvas into an HtmlCanvasElement"); // Verifies that the located browser element is actually an HTML canvas and keeps the typed handle for future rendering work.
+  let _render_canvas = canvas.dyn_into::<web_sys::HtmlCanvasElement>().expect("Could not convert render-canvas into an HtmlCanvasElement"); // Converts the generic browser element into the specific HTML canvas type required by WebGPU while allowing native tests to treat the browser-only handle as intentionally unused.
 
   spawn_local(async move { // Starts an asynchronous Rust task where our WebGPU initialization will run.
 
     let instance = gpu::gpu_context::create_instance(); // Creates the shared WebGPU instance that will later also own the rendering-surface creation step.
+
+    #[cfg(target_arch = "wasm32")] // Includes this browser-canvas surface code only when compiling the application for WebAssembly.
+
+    let _surface = instance.create_surface( // Asks the shared WebGPU instance to create a presentable rendering surface for our browser canvas.
+
+      wgpu::SurfaceTarget::Canvas(_render_canvas.clone()), // Supplies the verified typed HTML canvas handle that wgpu requires for browser surface creation.
+
+    ).expect("Could not create WebGPU surface from render-canvas"); // Stops with a clear error if the browser canvas cannot become a WebGPU rendering surface.
 
     let adapter = gpu::gpu_context::request_adapter(&instance).await; // Requests the same WebGPU adapter as before while keeping the instance available for the future rendering surface.
 
