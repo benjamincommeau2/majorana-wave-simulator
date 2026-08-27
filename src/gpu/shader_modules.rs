@@ -37,3 +37,23 @@ pub fn create_development_cube_shader(device: &wgpu::Device) -> wgpu::ShaderModu
   ) // Returns the compiled cube shader module.
 
 } // Finishes the development-cube shader helper.
+
+pub fn create_spatial_majorana_field_shader(device: &wgpu::Device) -> wgpu::ShaderModule { // Creates the WGSL shader that renders the actual three-dimensional spatial Majorana field.
+
+  device.create_shader_module( // Asks the existing WebGPU device to compile the spatial-field rendering shader.
+
+    wgpu::ShaderModuleDescriptor { // Starts the shader-module description.
+
+      label: Some("Spatial Majorana Field Shader"), // Gives the spatial-field shader a readable debugging name.
+
+      source: wgpu::ShaderSource::Wgsl( // Identifies the embedded source as WGSL.
+
+        include_str!("spatial_majorana_field.wgsl").into(), // Embeds the dedicated spatial-field shader file into the Rust/WASM application.
+
+      ), // Finishes the WGSL shader-source value.
+
+    }, // Finishes the shader-module descriptor.
+
+  ) // Returns the compiled spatial Majorana field shader module.
+
+} // Finishes the spatial-field shader helper.

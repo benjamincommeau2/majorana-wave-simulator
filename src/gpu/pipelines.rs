@@ -98,3 +98,75 @@ pub fn create_development_cube_pipeline( // Creates the render pipeline used for
   ) // Returns the completed development-cube pipeline.
 
 } // Finishes the development-cube pipeline helper.
+
+pub fn create_spatial_majorana_field_pipeline( // Creates the render pipeline used to visualize the actual three-dimensional Majorana field.
+
+  device: &wgpu::Device, // Borrows the WebGPU device responsible for creating the rendering pipeline.
+
+  shader: &wgpu::ShaderModule, // Borrows the already-compiled spatial Majorana field shader.
+
+  surface_format: wgpu::TextureFormat, // Receives the browser surface pixel format that the field renderer must write.
+
+) -> wgpu::RenderPipeline { // Returns the completed spatial-field render pipeline.
+
+  device.create_render_pipeline( // Asks WebGPU to create the rendering pipeline.
+
+    &wgpu::RenderPipelineDescriptor { // Starts the spatial-field render-pipeline configuration.
+
+      label: Some("Spatial Majorana Field Render Pipeline"), // Gives the pipeline a readable debugging name.
+
+      layout: None, // Lets wgpu infer the rotation-uniform and spatial-field storage bindings directly from the WGSL shader.
+
+      vertex: wgpu::VertexState { // Configures the field vertex stage.
+
+        module: shader, // Uses the spatial Majorana field WGSL module.
+
+        entry_point: Some("vs_main"), // Selects the spatial-field vertex function.
+
+        buffers: &[], // Uses no traditional vertex buffers because WGSL generates particle geometry from vertex_index.
+
+        compilation_options: wgpu::PipelineCompilationOptions::default(), // Uses the default vertex-shader compilation settings.
+
+      }, // Finishes the vertex-stage configuration.
+
+      fragment: Some(wgpu::FragmentState { // Configures the fragment stage that colors the rendered field particles.
+
+        module: shader, // Uses the same spatial-field WGSL module for fragment processing.
+
+        entry_point: Some("fs_main"), // Selects the spatial-field fragment function.
+
+        targets: &[Some(wgpu::ColorTargetState { // Defines the browser surface as the pipeline's single color output.
+
+          format: surface_format, // Matches the field renderer output to the configured browser surface format.
+
+          blend: Some(wgpu::BlendState::ALPHA_BLENDING), // Blends field particles using their amplitude-driven transparency instead of replacing existing pixels.
+
+          write_mask: wgpu::ColorWrites::ALL, // Allows the fragment shader to write every color channel.
+
+        })], // Finishes the pipeline's single color target.
+
+        compilation_options: wgpu::PipelineCompilationOptions::default(), // Uses the default fragment-shader compilation settings.
+
+      }), // Finishes the fragment-stage configuration.
+
+      primitive: wgpu::PrimitiveState { // Describes how WebGPU groups the shader-generated vertices.
+
+        topology: wgpu::PrimitiveTopology::TriangleList, // Treats every three vertices as one triangle so six vertices form each field particle.
+
+        ..Default::default() // Keeps the remaining primitive settings at their standard values.
+
+      }, // Finishes the primitive configuration.
+
+      depth_stencil: None, // Keeps depth buffering disabled for this first transparent spatial-field visualization.
+
+      multisample: wgpu::MultisampleState::default(), // Uses ordinary single-sample rendering.
+
+      multiview_mask: None, // Uses one normal browser view rather than multiview rendering.
+
+      cache: None, // Creates the pipeline without introducing a pipeline cache.
+
+    }, // Finishes the spatial-field render-pipeline descriptor.
+
+  ) // Returns the completed spatial Majorana field render pipeline.
+
+} // Finishes the spatial-field pipeline helper.

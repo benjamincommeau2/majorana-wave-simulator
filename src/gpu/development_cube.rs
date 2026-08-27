@@ -2,9 +2,9 @@
 
 mod mouse_drag_rotation; // Keeps mouse interaction private while allowing its deterministic behavior to be unit tested.
 
-#[cfg(target_arch = "wasm32")] // Includes one-frame development-cube rendering only in the browser build.
+#[cfg(target_arch = "wasm32")] // Includes one-frame spatial Majorana field rendering only in the browser build.
 
-mod render_development_cube_frame; // Keeps the GPU commands for rendering one cube frame in a separately named module.
+mod render_spatial_majorana_field_frame; // Keeps the GPU commands for drawing one actual spatial-field frame separate from animation setup.
 
 #[cfg(target_arch = "wasm32")] // Includes browser animation support only when compiling for WebAssembly.
 
@@ -24,19 +24,21 @@ use wasm_bindgen::JsCast; // Lets the Rust Closure be supplied where requestAnim
 
 #[cfg(target_arch = "wasm32")] // Builds this animation function only for the browser target.
 
-pub fn start_mouse_rotation( // Starts the development-cube renderer whose orientation is controlled by click-and-drag mouse movement.
+pub fn start_mouse_rotation( // Starts the spatial Majorana field renderer whose orientation is controlled by click-and-drag mouse movement.
 
-  canvas: web_sys::HtmlCanvasElement, // Receives the browser canvas so mouse-down and mouse-move listeners can be attached directly to the rendered cube.
+  canvas: web_sys::HtmlCanvasElement, // Receives the browser canvas so mouse listeners can control the displayed three-dimensional field.
 
-  surface: wgpu::Surface<'static>, // Takes ownership of the configured browser surface used to present rendered frames.
+  surface: wgpu::Surface<'static>, // Takes ownership of the configured browser surface used to present rendered field frames.
 
-  device: wgpu::Device, // Takes ownership of the WebGPU device needed to create per-frame rendering commands.
+  device: wgpu::Device, // Takes ownership of the WebGPU device used to create the field-rendering resources and per-frame commands.
 
-  queue: wgpu::Queue, // Takes ownership of the queue used to update the angle and submit each rendered frame.
+  queue: wgpu::Queue, // Takes ownership of the queue used to update rotation and submit each field-rendering frame.
 
-  pipeline: wgpu::RenderPipeline, // Takes ownership of the already-created development-cube rendering pipeline.
+  pipeline: wgpu::RenderPipeline, // Takes ownership of the already-created spatial Majorana field rendering pipeline.
 
-) { // Starts the development-cube animation setup.
+  spatial_majorana_field_buffer: wgpu::Buffer, // Takes ownership of the GPU storage buffer containing all 4096 four-component spatial field points.
+
+) { // Starts the spatial-field animation setup.
 
   let rotation_buffer = device.create_buffer( // Creates the small GPU buffer whose angle value will change every animation frame.
 
@@ -54,31 +56,17 @@ pub fn start_mouse_rotation( // Starts the development-cube renderer whose orien
 
   ); // Finishes creating the rotation buffer.
 
-  let rotation_layout = pipeline.get_bind_group_layout(0); // Retrieves the bind-group layout inferred from the shader's group-zero rotation uniform.
+  let field_bind_group = crate::gpu::bind_groups::create_spatial_majorana_field_render_bind_group( // Connects both rotation and the actual uploaded field data to the spatial rendering shader.
 
-  let rotation_bind_group = device.create_bind_group( // Connects the rotation buffer to the uniform declared in the cube shader.
+    &device, // Supplies the WebGPU device that creates the field render bind group.
 
-    &wgpu::BindGroupDescriptor { // Starts the cube rotation bind-group description.
+    &pipeline, // Supplies the spatial-field render pipeline whose binding layout comes from WGSL.
 
-      label: Some("Development Cube Rotation Bind Group"), // Gives the bind group a readable debugging name.
+    &rotation_buffer, // Supplies binding zero containing the mouse-controlled yaw and pitch.
 
-      layout: &rotation_layout, // Uses the layout inferred from the development-cube render pipeline.
+    &spatial_majorana_field_buffer, // Supplies binding one containing all 4096 uploaded Majorana field points.
 
-      entries: &[ // Starts the list of resources supplied to the cube shader.
-
-        wgpu::BindGroupEntry { // Starts the shader resource at binding zero.
-
-          binding: 0, // Matches binding zero in development_cube.wgsl.
-
-          resource: rotation_buffer.as_entire_binding(), // Makes the complete sixteen-byte rotation buffer visible to the vertex shader.
-
-        }, // Finishes the binding-zero entry.
-
-      ], // Finishes the bind-group resource list.
-
-    }, // Finishes the bind-group description.
-
-  ); // Finishes creating the rotation bind group.
+  ); // Finishes creating the spatial-field rendering bind group.
 
   let drag_state = mouse_drag_rotation::attach_mouse_drag_rotation( // Delegates browser mouse interaction to the explicitly named mouse-drag module.
 
@@ -114,23 +102,23 @@ pub fn start_mouse_rotation( // Starts the development-cube renderer whose orien
 
       }; // Finishes copying the mouse-controlled angles.
 
-      render_development_cube_frame::render_development_cube_frame( // Delegates all GPU work for this single frame to the explicitly named frame-rendering module.
+      render_spatial_majorana_field_frame::render_spatial_majorana_field_frame( // Renders the actual uploaded Majorana field using the current mouse-controlled orientation.
 
-        &surface, // Supplies the configured browser surface that receives the rendered frame.
+        &surface, // Supplies the configured browser surface that receives this field frame.
 
-        &device, // Supplies the WebGPU device used to create this frame's command encoder.
+        &device, // Supplies the WebGPU device used to record the frame.
 
-        &queue, // Supplies the queue used for the uniform update, GPU submission, and presentation.
+        &queue, // Supplies the queue used for rotation updates and rendering submission.
 
-        &pipeline, // Supplies the existing development-cube rendering pipeline.
+        &pipeline, // Supplies the spatial Majorana field rendering pipeline.
 
-        &rotation_buffer, // Supplies the uniform buffer containing the cube orientation.
+        &rotation_buffer, // Supplies the yaw-and-pitch uniform buffer.
 
-        &rotation_bind_group, // Supplies the bind group that exposes the rotation uniform to WGSL.
+        &field_bind_group, // Supplies both the rotation uniform and complete uploaded field storage buffer.
 
-        &rotation_values, // Supplies the current mouse-controlled yaw and pitch values.
+        &rotation_values, // Supplies the current mouse-controlled yaw and pitch.
 
-      ); // Finishes rendering this development-cube frame.
+      ); // Finishes rendering this spatial Majorana field frame.
 
       let window = web_sys::window().expect("Could not get browser window for cube animation"); // Gets the browser Window needed to request the next frame.
 

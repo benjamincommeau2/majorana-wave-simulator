@@ -49,6 +49,38 @@ pub fn start() -> Result<(), JsValue> { // Defines the startup function and says
 
     let (device, queue) = gpu::gpu_context::request_device_and_queue(&adapter).await; // Delegates WebGPU device and queue creation to the explicitly named GPU context module.
 
+    let spatial_majorana_field = crate::spatial_majorana_field::SpatialMajoranaField::new_centered_gaussian( // Creates the actual three-dimensional Majorana field that will be uploaded to WebGPU.
+
+      16, // Creates sixteen spatial samples along each of the x, y, and z axes for a total of 4096 field points.
+
+      2.0, // Uses the currently tested Gaussian width for this first spatial visualization.
+
+    ); // Finishes creating the initial spatial Majorana field.
+
+    let spatial_majorana_field_bytes = bytemuck::cast_slice( // Views the contiguous four-component field points as raw bytes without copying them.
+
+      spatial_majorana_field.points(), // Borrows all 4096 four-component Majorana field points in their existing contiguous memory layout.
+
+    ); // Finishes creating the byte view used for GPU upload.
+
+    let spatial_majorana_field_buffer = gpu::spatial_majorana_field_buffer::create_spatial_majorana_field_buffer( // Allocates GPU storage large enough to hold the complete three-dimensional Majorana field.
+
+      &device, // Supplies the existing WebGPU device that owns the new field buffer.
+
+      spatial_majorana_field_bytes.len() as wgpu::BufferAddress, // Allocates exactly the number of bytes occupied by all 4096 four-component field points.
+
+    ); // Finishes creating the GPU spatial-field buffer.
+
+    queue.write_buffer( // Uploads the initialized spatial Majorana field into the newly allocated GPU storage buffer.
+
+      &spatial_majorana_field_buffer, // Selects the GPU storage buffer reserved for the complete spatial field.
+
+      0, // Starts writing at byte zero because this upload replaces the complete initial contents of the field buffer.
+
+      spatial_majorana_field_bytes, // Supplies the actual Gaussian Majorana field data as contiguous bytes.
+
+    ); // Finishes scheduling the spatial-field upload.
+
     #[cfg(target_arch = "wasm32")] // Includes browser-surface configuration only when compiling the application for WebAssembly.
 
     let surface_config = surface.get_default_config( // Asks wgpu to choose a supported default presentation configuration for this surface and adapter.
@@ -71,21 +103,25 @@ pub fn start() -> Result<(), JsValue> { // Defines the startup function and says
 
     ); // Finishes configuring the browser rendering surface.
 
-    #[cfg(target_arch = "wasm32")] // Includes cube-shader creation only in the browser WebAssembly build.
+    #[cfg(target_arch = "wasm32")] // Includes spatial-field shader creation only in the browser WebAssembly build.
 
-    let development_cube_shader = gpu::shader_modules::create_development_cube_shader(&device); // Compiles the dedicated development-cube WGSL shader.
-
-    #[cfg(target_arch = "wasm32")] // Includes cube-pipeline creation only in the browser WebAssembly build.
-
-    let development_cube_pipeline = gpu::pipelines::create_development_cube_pipeline( // Creates the pipeline that will turn shader-generated vertices into visible cube edges.
+    let spatial_majorana_field_shader = gpu::shader_modules::create_spatial_majorana_field_shader( // Compiles the rendering shader that reads the actual uploaded spatial Majorana field.
 
       &device, // Supplies the existing WebGPU device.
 
-      &development_cube_shader, // Supplies the compiled development-cube shader.
+    ); // Finishes compiling the spatial-field shader.
 
-      surface_config.format, // Matches the cube output to the browser surface's configured pixel format.
+    #[cfg(target_arch = "wasm32")] // Includes spatial-field pipeline creation only in the browser WebAssembly build.
 
-    ); // Finishes creating the cube render pipeline.
+    let spatial_majorana_field_pipeline = gpu::pipelines::create_spatial_majorana_field_pipeline( // Creates the triangle-based pipeline used to render the actual field samples.
+
+      &device, // Supplies the existing WebGPU device.
+
+      &spatial_majorana_field_shader, // Supplies the compiled field-rendering WGSL module.
+
+      surface_config.format, // Matches the field renderer output to the browser surface format.
+
+    ); // Finishes creating the spatial Majorana field rendering pipeline.
 
     gpu::start_gpu_j_runtime_verification::start_gpu_j_runtime_verification( // Delegates the complete GPU J dispatch, readback, and CPU-reference comparison to its explicitly named module.
 
@@ -109,7 +145,9 @@ pub fn start() -> Result<(), JsValue> { // Defines the startup function and says
 
       queue, // Gives the animation loop ownership of the existing WebGPU queue.
 
-      development_cube_pipeline, // Gives the animation loop ownership of the already-created cube rendering pipeline.
+      spatial_majorana_field_pipeline, // Gives the animation loop ownership of the actual spatial-field rendering pipeline.
+
+      spatial_majorana_field_buffer, // Gives the animation loop ownership of the GPU buffer containing all 4096 Majorana field samples.
 
     ); // Finishes starting the continuously rotating development cube.
 
