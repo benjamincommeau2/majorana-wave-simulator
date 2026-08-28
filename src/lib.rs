@@ -16,3 +16,4 @@ pub mod spatial_majorana_field; // Makes the three-dimensional Majorana field re
 
 mod browser_startup; // Includes the browser and WebAssembly startup module in the compiled application.
 
+pub mod simulation_clock; // Exposes the pure simulation clock used to schedule fixed physics steps independently from rendering.
