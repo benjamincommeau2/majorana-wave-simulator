@@ -383,5 +383,186 @@ fn uniform_mass_profile_matches_scalar_mass_chebyshev_propagation() {
     );
 
   }
+}
+
+#[test] // Verifies piecewise-static evolution: moving the mass boundary changes the next Hamiltonian without reinitializing the quantum state.
+
+fn moved_mass_boundary_uses_previous_propagated_state() {
+
+  let point_count = 5;
+
+  let lattice_spacing = 1.0_f32;
+
+  let left_mass = 0.0_f32;
+
+  let right_mass = 3.0_f32;
+
+  let spectral_scale = 6.0_f32;
+
+  let physics_dt = 0.1_f64;
+
+  let max_order = 12;
+
+  let initial_state = [
+
+    1.0,
+
+    2.0,
+
+    3.0,
+
+    4.0,
+
+  ];
+
+  let initial_field = vec![
+
+    initial_state;
+
+    point_count
+
+  ];
+
+  let mass_profile_a = create_mass_step_profile_1d( // Starts with the mass boundary at lattice index 2.
+
+    point_count,
+
+    2,
+
+    left_mass,
+
+    right_mass,
+
+  );
+
+  let mass_profile_b = create_mass_step_profile_1d( // Represents the player moving the same boundary one lattice site to the right.
+
+    point_count,
+
+    3,
+
+    left_mass,
+
+    right_mass,
+
+  );
+
+  let coefficients = precompute_chebyshev_coefficients( // Computes one coefficient set that is reused for both frozen propagation intervals.
+
+    spectral_scale as f64,
+
+    physics_dt,
+
+    max_order,
+
+  );
+
+  let state_after_a = direct_real_chebyshev_propagate_with_mass_profile_1d( // Evolves the initial quantum state under the first frozen Hamiltonian.
+
+    &initial_field,
+
+    lattice_spacing,
+
+    &mass_profile_a,
+
+    spectral_scale,
+
+    &coefficients,
+
+  );
+
+  let state_after_b = direct_real_chebyshev_propagate_with_mass_profile_1d( // Continues from the already-evolved state after changing only the mass boundary.
+
+    &state_after_a,
+
+    lattice_spacing,
+
+    &mass_profile_b,
+
+    spectral_scale,
+
+    &coefficients,
+
+  );
+
+  let incorrectly_reset_state_after_b = direct_real_chebyshev_propagate_with_mass_profile_1d( // Models the incorrect behavior of restarting from the original state when the boundary moves.
+
+    &initial_field,
+
+    lattice_spacing,
+
+    &mass_profile_b,
+
+    spectral_scale,
+
+    &coefficients,
+
+  );
+
+  let tolerance = 1.0e-4_f32;
+
+  let mut first_interval_changed_state = false;
+
+  let mut continued_evolution_differs_from_reset = false;
+
+  for spatial_index in 0..point_count {
+
+    for component_index in 0..4 {
+
+      let first_interval_difference =
+
+        (
+
+          state_after_a[spatial_index][component_index]
+
+          - initial_field[spatial_index][component_index]
+
+        )
+
+        .abs();
+
+      if first_interval_difference > tolerance {
+
+        first_interval_changed_state = true;
+
+      }
+
+      let reset_difference =
+
+        (
+
+          state_after_b[spatial_index][component_index]
+
+          - incorrectly_reset_state_after_b[spatial_index][component_index]
+
+        )
+
+        .abs();
+
+      if reset_difference > tolerance {
+
+        continued_evolution_differs_from_reset = true;
+
+      }
+
+    }
+
+  }
+
+  assert!(
+
+    first_interval_changed_state,
+
+    "The first frozen Hamiltonian interval should evolve the initial quantum state.",
+
+  );
+
+  assert!(
+
+    continued_evolution_differs_from_reset,
+
+    "The second interval must continue from the previously evolved state rather than restart from the initial state.",
+
+  );
 
 }
