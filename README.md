@@ -1066,28 +1066,82 @@ All of these identities should be enforced by automated tests so that later opti
 
 ---
 
-## Why J Is Chosen as an Identity Tensor an Active Y Factor
+## Why J Is Chosen With an Identity Factor and the Active Y on the Fastest Internal Stride
 
-Define the real two-dimensional complex structure
+The choice
 
 ```math
-J_2=iY
-=
+\boxed{
+J=I\otimes(iY)
+}
+```
+
+is not only an algebraic convention.
+
+It is also a deliberate computational and memory-layout choice.
+
+With the standard tensor ordering used by this project, the rightmost tensor factor is the fastest-changing internal factor. Therefore the nontrivial $iY$ part of $J$ acts on the closest spinor components in memory, while the other tensor factor is the identity.
+
+For a four-real-component Majorana spinor
+
+```math
+\Psi=
 \begin{pmatrix}
-0&1\\
--1&0
-\end{pmatrix}.
+a\\
+b\\
+c\\
+d
+\end{pmatrix},
+```
+
+the memory-local J planes are
+
+```text
+[a,b] [c,d]
+```
+
+and
+
+```math
+J(a,b,c,d)
+=
+(b,-a,d,-c).
+```
+
+The active $iY$ operation therefore acts on adjacent values in the fastest internal stride:
+
+```text
+memory
+
+a  b  c  d
+│  │  │  │
+└──┘  └──┘
+ iY    iY
+```
+
+This arrangement is intentional.
+
+The design goal is to make the operation that defines the J-complex Fourier structure as local as practical in memory before optimizing the much larger spatial FFT traversal.
+
+---
+
+### The Identity Factor Creates a Spectator Dimension
+
+Define
+
+```math
+J_2=iY.
 ```
 
 Then
 
 ```math
-J
-=
-I\otimes J_2.
+J=I\otimes J_2.
 ```
 
-Because the first tensor factor is the identity, the J-Fourier rotation factorizes:
+The identity factor means that one internal two-state dimension is completely untouched by the J rotation.
+
+Consequently,
 
 ```math
 \boxed{
@@ -1097,41 +1151,289 @@ I\otimes e^{-J_2\theta}.
 }
 ```
 
-Using
-
-```math
-J_2^2=-I,
-```
-
-the active two-dimensional rotation is
-
-```math
-e^{-J_2\theta}
-=
-I\cos\theta
--
-J_2\sin\theta.
-```
-
-Therefore the four-component J rotation is not a generic dense four-dimensional matrix operation.
-
-It is two copies of the same two-dimensional rotation:
+The four-component operation therefore separates into two independent copies of exactly the same two-dimensional J rotation:
 
 ```text
 spectator channel 0       spectator channel 1
 
       [a,b]                     [c,d]
         │                         │
-        └── same J twiddle ───────┘
+        └──── same twiddle ───────┘
         │                         │
      [a',b']                   [c',d']
 ```
 
-This factorization is one of the reasons for choosing a representation with an identity tensor factor in $J$.
+This spectator factor is valuable computationally because the FFT does not need a generic four-component matrix twiddle.
 
-A structure in which both tensor factors participated nontrivially in $J$ would lose this clean spectator-factor decomposition.
+Instead, the same small J rotation can be applied independently to two memory-local channels.
 
 ---
+
+### Why This Is Useful for the J-FFT
+
+The J-DFT uses rotations of the form
+
+```math
+e^{-J\theta}.
+```
+
+Because
+
+```math
+J=I\otimes(iY),
+```
+
+the transform kernel can treat each adjacent real pair as one J-complex value.
+
+Using
+
+```math
+z_0=a-ib,
+\qquad
+z_1=c-id,
+```
+
+the four-real-component state has the zero-copy packed interpretation
+
+```text
+[a,b,c,d]
+
+   ↓
+
+[a,b] [c,d]
+
+   ↓
+
+ z0     z1
+```
+
+and the same Fourier twiddle angle applies to both channels.
+
+This creates several implementation opportunities:
+
+- adjacent J-pair loads and stores,
+- `vec2` or `vec4`-friendly GPU operations,
+- zero-copy reinterpretation as two packed complex channels,
+- reuse of the same FFT butterfly structure for both spectator channels,
+- fewer reasons to perform a general $4\times4$ matrix operation inside an FFT stage,
+- and clearer separation between spinor-local work and spatial FFT work.
+
+These properties are part of the reason this representation was chosen.
+
+---
+
+### The Basis Also Gives More Freedom in Parallel Data Decomposition
+
+The identity factor provides a dimension across which the J operation itself introduces no coupling.
+
+That gives the implementation more freedom to divide work into independently schedulable pieces where the numerical algorithm permits it.
+
+For example, FFT work may eventually be batched over independent transform lines:
+
+```text
+line 0 ───────── FFT
+line 1 ───────── FFT
+line 2 ───────── FFT
+line 3 ───────── FFT
+...
+```
+
+and each line contains the same two independent J-complex spectator channels:
+
+```text
+line n
+
+channel 0: [a,b]
+channel 1: [c,d]
+```
+
+This can make it easier to organize:
+
+- GPU workgroups,
+- independent FFT batches,
+- ping-pong buffers,
+- tiled transforms,
+- different-sized work batches,
+- asynchronous command scheduling,
+- streaming or staged processing,
+- and future domain decomposition when the algorithm permits independent regions.
+
+The important qualification is that an FFT has global butterfly dependencies.
+
+The field cannot be divided into arbitrary uneven pieces at every FFT stage and evolved independently without respecting those dependencies.
+
+The useful freedom is instead that **independent FFT lines, batches, spectator channels, tiles, and completed transform stages can be partitioned without introducing additional coupling from $J$ itself**.
+
+So the identity factor removes one possible source of internal coupling even though the spatial FFT still imposes its own communication structure.
+
+---
+
+### Internal Stride and Spatial Stride Are Optimized Together
+
+The intended memory hierarchy has two separate locality goals.
+
+First, the active J rotation should be local inside each spinor:
+
+```text
+fastest internal stride
+
+[a,b] [c,d]
+  Y     Y
+```
+
+Second, the spatial coordinate currently being Fourier transformed should be the fastest spatial direction:
+
+```text
+spinor
+  ↓
+active FFT coordinate
+  ↓
+remaining spatial coordinates
+  ↓
+scratch / whole-field buffer
+```
+
+For an X-active transform this is represented conceptually as
+
+```text
+[scratch][z][y][x][spinor]
+```
+
+with the local memory pattern
+
+```text
+x0: [a,b,c,d]
+x1: [a,b,c,d]
+x2: [a,b,c,d]
+x3: [a,b,c,d]
+...
+```
+
+The spinor remains locally packed while consecutive X sites are also contiguous.
+
+After an axis permutation, the same principle can be retained for Y:
+
+```text
+[scratch][z][x][y][spinor]
+```
+
+and then Z:
+
+```text
+[scratch][y][x][z][spinor]
+```
+
+Thus the design tries to keep both important operations close to memory:
+
+```text
+J operation
+→ fastest internal stride
+
+current FFT direction
+→ fastest spatial stride
+```
+
+---
+
+### Why This Choice Is Preferred Over a More Entangled J
+
+A representation in which both internal tensor factors participate nontrivially in $J$, for example a structure schematically resembling
+
+```math
+Y\otimes Z,
+```
+
+could still satisfy useful algebraic identities.
+
+However, it would not provide the same simple decomposition
+
+```math
+J=I\otimes J_2.
+```
+
+The chosen representation deliberately preserves an identity spectator factor so that the Fourier complex structure lives entirely in one small, fast internal dimension.
+
+The motivation is therefore not merely
+
+> "`I\otimes Y` is mathematically simple."
+
+The stronger design motivation is
+
+> **Place the nontrivial J-complex rotation on the fastest internal stride, preserve an identity spectator dimension, and leave as much freedom as possible for vectorization, FFT batching, spatial-axis permutation, buffer reuse, and parallel work decomposition.**
+
+---
+
+### What This Choice Does and Does Not Prove About Performance
+
+The following consequences follow directly from the representation:
+
+```text
+PROVEN BY THE LAYOUT AND ALGEBRA
+
+J acts on adjacent component pairs.
+
+One tensor factor is a spectator under J.
+
+The J exponential separates into two identical
+two-dimensional rotations.
+
+The four-real state can be interpreted as two
+packed J-complex channels without adding state.
+
+J itself adds no coupling between those two
+spectator channels.
+```
+
+The following are deliberate performance-oriented design choices:
+
+```text
+DESIGN INTENT
+
+put the active Y factor on the fastest internal stride.
+
+keep each J pair adjacent in memory.
+
+keep the active spatial FFT direction contiguous.
+
+preserve the spectator factor when partitioning work.
+
+permit layout permutations between X, Y, and Z transforms.
+
+organize scratch fields so large working buffers remain reusable.
+```
+
+The following still require profiling:
+
+```text
+UNKNOWN UNTIL MEASURED
+
+whether this is the globally fastest possible basis.
+
+the best WebGPU FFT algorithm.
+
+the best transpose strategy.
+
+the best workgroup and tile sizes.
+
+how much asynchronous overlap the browser WebGPU
+implementation actually permits.
+
+whether uneven work batches improve throughput.
+
+whether explicit XYZ transposes outperform a
+Stockham-style transform.
+
+whether packed vec2, vec4, or another representation
+performs best on the target GPU.
+```
+
+The project therefore treats
+
+```math
+J=I\otimes(iY)
+```
+
+as a **performance-motivated representation choice**, while still requiring benchmarks before claiming that any particular FFT implementation is optimal.
 
 ## Packed Complex Interpretation
 
@@ -1279,7 +1581,7 @@ For spinor component $s$ and scratch-field slot $b$, the flattened scalar offset
 
 ```math
 \boxed{
-\operatorname{offset}_{x}
+\mathrm{offset}_{x}
 =
 s
 +
