@@ -6,4 +6,6 @@ pub mod j_fourier_transform; // Makes the direct CPU J-DFT reference implementat
 
 pub mod momentum_grid; // Makes the tested discrete spectral momentum-grid construction available through the physics module.
 
-pub mod spectral_derivative; // Makes the CPU reference spectral-derivative implementation available through the physics module.
+pub mod spectral_derivative; // Makes the tested CPU reference spectral derivative available through the physics module.
+
+pub mod dirac_generator; // Makes the real Majorana Dirac time-generator operations available through the physics module.
