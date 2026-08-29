@@ -13,7 +13,7 @@ fn correct_gpu_j_readback_matches_cpu_reference() {
 
   let uploaded_components = [1.0, 2.0, 3.0, 4.0]; // Uses a state whose four distinct values make ordering and sign mistakes visible.
 
-  let gpu_result = [3.0, 4.0, -1.0, -2.0]; // Represents the correct J-transformed GPU result for the chosen input.
+  let gpu_result = [2.0, -1.0, 4.0, -3.0]; // Represents the correct J-transformed GPU result for J = I tensor iY acting on adjacent component pairs.
 
   let readback_bytes = components_as_bytes(&gpu_result); // Converts the expected GPU components into simulated readback bytes.
 
@@ -59,7 +59,7 @@ fn wrongly_ordered_gpu_j_readback_does_not_match_cpu_reference() {
 
   let uploaded_components = [1.0, 2.0, 3.0, 4.0]; // Uses distinct values so swapping components cannot accidentally produce the correct result.
 
-  let wrongly_ordered_result = [4.0, 3.0, -1.0, -2.0]; // Simulates a GPU result whose first two J-output components are incorrectly reversed.
+  let wrongly_ordered_result = [-1.0, 2.0, 4.0, -3.0]; // Simulates a GPU result whose first adjacent J-output pair is incorrectly reversed.
 
   let readback_bytes = components_as_bytes(&wrongly_ordered_result); // Converts the intentionally incorrect result into GPU-style bytes.
 
@@ -83,7 +83,7 @@ fn wrongly_signed_gpu_j_readback_does_not_match_cpu_reference() {
 
   let uploaded_components = [1.0, 2.0, 3.0, 4.0]; // Uses nonzero values so incorrect signs remain observable.
 
-  let wrongly_signed_result = [3.0, 4.0, 1.0, 2.0]; // Simulates a GPU result that omitted the required negative signs on the final two components.
+  let wrongly_signed_result = [2.0, 1.0, 4.0, 3.0]; // Simulates a GPU result that omitted the required negative signs from both adjacent iY component pairs.
 
   let readback_bytes = components_as_bytes(&wrongly_signed_result); // Converts the intentionally wrong values into GPU-style readback bytes.
 

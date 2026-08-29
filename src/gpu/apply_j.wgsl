@@ -10,15 +10,15 @@ fn main() { // Starts the compute operation that will apply J to one Majorana st
 
   let input = state[0]; // Reads the first four-component Majorana state from GPU storage.
 
-  state[0] = vec4<f32>( // Starts constructing the transformed four-component state.
+  state[0] = vec4<f32>( // Starts constructing the transformed four-component state for J = I tensor iY.
 
-    input.z, // Moves the third input component into the first output component.
+    input.y, // Applies iY to the adjacent pair [a,b], producing b as the first output component.
 
-    input.w, // Moves the fourth input component into the second output component.
+    -input.x, // Applies iY to the adjacent pair [a,b], producing -a as the second output component.
 
-    -input.x, // Negates the first input component and places it in the third output component.
+    input.w, // Applies the same iY action to the adjacent pair [c,d], producing d as the third output component.
 
-    -input.y, // Negates the second input component and places it in the fourth output component.
+    -input.z, // Applies the same iY action to the adjacent pair [c,d], producing -c as the fourth output component.
 
   ); // Finishes the transformed Majorana state and writes it back into GPU storage.
 
