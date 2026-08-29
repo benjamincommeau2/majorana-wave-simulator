@@ -32,7 +32,7 @@ pub fn direct_real_chebyshev_basis_1d( // Constructs real Chebyshev basis fields
 
   let phi_zero = field.to_vec(); // Defines Phi_0 = Psi exactly as required by the real Chebyshev basis.
 
-  let mut basis_states = Vec::with_capacity( // Allocates enough outer storage for Phi_0 through Phi_max_order.
+  let mut basis_states = Vec::with_capacity(
 
     max_order + 1,
 
@@ -170,7 +170,7 @@ pub fn precompute_chebyshev_coefficients( // Computes the Bessel weights once fo
 
 ) -> Vec<f64> {
 
-  assert!( // Requires the spectral scale a to be physically and numerically meaningful.
+  assert!(
 
     spectral_scale > 0.0,
 
@@ -178,7 +178,7 @@ pub fn precompute_chebyshev_coefficients( // Computes the Bessel weights once fo
 
   );
 
-  assert!( // Allows the exact t = 0 case while rejecting a negative numerical timestep.
+  assert!(
 
     physics_dt >= 0.0,
 
@@ -186,7 +186,7 @@ pub fn precompute_chebyshev_coefficients( // Computes the Bessel weights once fo
 
   );
 
-  assert!( // Prevents an overflowing conversion because libm::jn receives its integer order as i32.
+  assert!(
 
     max_order <= i32::MAX as usize,
 
@@ -200,7 +200,7 @@ pub fn precompute_chebyshev_coefficients( // Computes the Bessel weights once fo
 
     * physics_dt;
 
-  let mut coefficients = Vec::with_capacity( // Allocates exactly one coefficient for every order from zero through M.
+  let mut coefficients = Vec::with_capacity(
 
     max_order + 1,
 
@@ -208,7 +208,7 @@ pub fn precompute_chebyshev_coefficients( // Computes the Bessel weights once fo
 
   for order in 0..=max_order {
 
-    let bessel_value = libm::jn( // Delegates the actual integer-order Bessel J calculation to the established math library.
+    let bessel_value = libm::jn( // Delegates the integer-order Bessel J calculation to libm during setup.
 
       order as i32,
 
@@ -216,11 +216,11 @@ pub fn precompute_chebyshev_coefficients( // Computes the Bessel weights once fo
 
     );
 
-    let coefficient = if order == 0 { // Uses c_0 = J_0(z) without the factor of two.
+    let coefficient = if order == 0 {
 
       bessel_value
 
-    } else { // Uses c_n = 2 J_n(z) for every positive Chebyshev order.
+    } else {
 
       2.0
 
@@ -236,6 +236,122 @@ pub fn precompute_chebyshev_coefficients( // Computes the Bessel weights once fo
 
   }
 
-  coefficients // Returns the small array that can be stored once and reused for every fixed-timestep propagation step.
+  coefficients
+
+}
+
+pub fn direct_real_chebyshev_propagate_1d( // Applies the Bessel-weighted real Chebyshev expansion using coefficients that were already computed during simulation setup.
+
+  field: &[[f32; 4]],
+
+  lattice_spacing: f32,
+
+  mass: f32,
+
+  spectral_scale: f32,
+
+  coefficients: &[f64],
+
+) -> Vec<[f32; 4]> {
+
+  assert!( // Requires at least the zeroth-order coefficient so the expansion always contains Phi_0.
+
+    !coefficients.is_empty(),
+
+    "Chebyshev propagation requires at least the zeroth-order coefficient.",
+
+  );
+
+  let max_order = // Infers the requested Chebyshev truncation order directly from the reusable coefficient array.
+
+    coefficients.len()
+
+    - 1;
+
+  let basis_states = direct_real_chebyshev_basis_1d( // Builds the inspectable CPU-reference basis fields required by this coefficient array.
+
+    field,
+
+    lattice_spacing,
+
+    mass,
+
+    spectral_scale,
+
+    max_order,
+
+  );
+
+  let mut accumulated_field = vec![ // Uses f64 only for the small scalar weighted accumulation so the CPU oracle loses less precision.
+
+    [0.0_f64; 4];
+
+    field.len()
+
+  ];
+
+  for order in 0..=max_order { // Adds c_n Phi_n for every retained Chebyshev order.
+
+    let coefficient =
+
+      coefficients[order];
+
+    for spatial_index in 0..field.len() {
+
+      accumulated_field[spatial_index][0] +=
+
+        coefficient
+
+        * basis_states[order][spatial_index][0] as f64;
+
+      accumulated_field[spatial_index][1] +=
+
+        coefficient
+
+        * basis_states[order][spatial_index][1] as f64;
+
+      accumulated_field[spatial_index][2] +=
+
+        coefficient
+
+        * basis_states[order][spatial_index][2] as f64;
+
+      accumulated_field[spatial_index][3] +=
+
+        coefficient
+
+        * basis_states[order][spatial_index][3] as f64;
+
+    }
+
+  }
+
+  let mut propagated_field = Vec::with_capacity(
+
+    field.len(),
+
+  );
+
+  for accumulated_state in accumulated_field { // Converts the high-precision CPU accumulation back to the simulator's four-f32 field representation.
+
+    propagated_field.push(
+
+      [
+
+        accumulated_state[0] as f32,
+
+        accumulated_state[1] as f32,
+
+        accumulated_state[2] as f32,
+
+        accumulated_state[3] as f32,
+
+      ],
+
+    );
+
+  }
+
+  propagated_field
 
 }
