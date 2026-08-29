@@ -2072,9 +2072,26 @@ This gives the simulator a finite-parameter way to create strong reflecting stru
 
 # Time-Dependent / Moving Mass Profiles
 
-The mass profile may eventually move with time.
+The first interactive mass structures should be simple piecewise spatial step functions.
 
-The initial strategy remains the same incremental frozen-operator idea developed in the Weyl prototype. During interval $j$, approximate
+For example, a one-dimensional mass interface may be written
+
+```math
+m(x)
+=
+\begin{cases}
+m_\mathrm{left}, & x < x_0,\\
+m_\mathrm{right}, & x \ge x_0.
+\end{cases}
+```
+
+The boundary position $x_0$ may be changed interactively by the player.
+
+More complicated barriers can be constructed from multiple piecewise steps, but the initial implementation should prefer simple sharp interfaces before introducing smooth continuously varying mass profiles.
+
+The time dependence is treated with a **piecewise-static Hamiltonian approximation**.
+
+During physics timestep $j$, the current mass configuration is frozen:
 
 ```math
 m(\mathbf x,t)
@@ -2082,7 +2099,7 @@ m(\mathbf x,t)
 m_j(\mathbf x).
 ```
 
-This defines a frozen generator
+This defines the real Majorana generator
 
 ```math
 K_j
@@ -2091,59 +2108,305 @@ K_j
 -i\beta m_j(\mathbf x).
 ```
 
-The state is propagated under that static generator, then handed to the next interval:
+The state is then propagated for one fixed numerical interval using that static generator:
+
+```math
+\boxed{
+\Psi_{j+1}
+=
+e^{K_j\Delta t}\Psi_j.
+}
+```
+
+If the player changes a mass boundary, the simulator does **not** construct a new quantum state and does **not** restart the wavefunction.
+
+Instead, the already-evolved state is preserved continuously:
+
+```math
+\boxed{
+\Psi(t_j^+)
+=
+\Psi(t_j^-).
+}
+```
+
+Only the generator used for the next propagation interval changes.
+
+Conceptually:
 
 ```text
-Psi_0
-  --K_0--> Psi_1
-  --K_1--> Psi_2
-  --K_2--> Psi_3
-  --> ...
+initial quantum state
+        ↓
+propagate with K_0
+        ↓
+Psi_1
+        ↓
+player moves mass boundary
+        ↓
+keep Psi_1 unchanged
+        ↓
+construct/use K_1
+        ↓
+propagate with K_1
+        ↓
+Psi_2
+        ↓
+player moves boundary again
+        ↓
+keep Psi_2 unchanged
+        ↓
+construct/use K_2
+        ↓
+...
 ```
 
-The ordering matters because generators corresponding to different mass profiles generally do not commute.
+There is therefore only one explicit quantum-state initialization at the beginning of a simulation run.
 
-The first implementation should therefore favor correctness and explicit chronological handoff over a sophisticated continuous time-ordering scheme.
+Later mass changes act as sudden changes, or quenches, of the Hamiltonian rather than resets of the physical state.
+
+Over several frozen intervals the numerical evolution has the ordered form
+
+```math
+\Psi_N
+=
+e^{K_{N-1}\Delta t}
+\cdots
+e^{K_2\Delta t}
+e^{K_1\Delta t}
+e^{K_0\Delta t}
+\Psi_0.
+```
+
+The ordering matters because generators associated with different mass configurations generally do not commute.
+
+For interactive control, changes to the player-defined mass profile should take effect between fixed physics timesteps.
+
+The simulator therefore does not need to predict the player's future motion.
+
+At each physics step it only needs:
+
+```text
+current evolved state
+        +
+latest mass-boundary configuration
+        ↓
+freeze generator for this timestep
+        ↓
+propagate one timestep
+```
+
+This is intentionally simpler than attempting a higher-order continuously time-dependent propagator and is appropriate for an interactive system whose future Hamiltonian depends on unpredictable player input.
+
+# Real Majorana Bessel-Chebyshev Time Propagation
+
+The stored real Majorana state obeys
+
+```math
+\partial_t\Psi
+=
+K\Psi,
+```
+
+where $K$ is a real skew/anti-Hermitian generator.
+
+The exact frozen-generator evolution over one physics timestep is
+
+```math
+\Psi(t+\Delta t)
+=
+e^{K\Delta t}\Psi(t).
+```
+
+The simulator uses a real reformulation of the Bessel-Chebyshev expansion.
+
+Introduce a positive spectral scale $a$ large enough to bound the spectrum relevant to the frozen generator.
+
+Define the real Chebyshev basis states by
+
+```math
+\Phi_0
+=
+\Psi,
+```
+
+```math
+\Phi_1
+=
+\frac{K}{a}\Psi,
+```
+
+and
+
+```math
+\boxed{
+\Phi_{n+1}
+=
+\frac{2K}{a}\Phi_n
++
+\Phi_{n-1}.
+}
+```
+
+The plus sign in this recurrence is intentional.
+
+It results from absorbing the usual complex phase factors of the Hermitian Chebyshev expansion into a real basis appropriate for the Majorana generator.
+
+The propagated state is
+
+```math
+\boxed{
+\Psi(t+\Delta t)
+=
+J_0(z)\Phi_0
++
+2
+\sum_{n=1}^{M}
+J_n(z)\Phi_n,
+}
+```
+
+where
+
+```math
+z
+=
+a\Delta t.
+```
+
+The implementation therefore remains entirely in the four-real-component Majorana representation.
+
+No persistent complex wavefunction or charge-conjugate state is required.
+
+The CPU reference implementation has been tested against a single-mode analytic solution satisfying
+
+```math
+K^2\Psi
+=
+-E^2\Psi.
+```
+
+For such a mode,
+
+```math
+e^{K\Delta t}\Psi
+=
+\cos(E\Delta t)\Psi
++
+\frac{\sin(E\Delta t)}{E}K\Psi.
+```
+
+The Bessel-Chebyshev CPU propagator reproduces this independently known nonzero-time evolution within the expected floating-point tolerance.
 
 ---
 
-# Time Propagation After the Pivot
+## Bessel Coefficients Are Precomputed Once
 
-The original Weyl design selected a Chebyshev/Jacobi-Anger expansion for
-
-```math
-e^{-iH\Delta t}.
-```
-
-That remains an important candidate because it can fast-forward a static generator without Trotter splitting and because it uses only repeated Hamiltonian applications.
-
-However, the Majorana pivot changes the implementation question.
-
-The physically stored state now obeys
+For a fixed simulation timestep, spectral scale, and Chebyshev truncation order,
 
 ```math
-\partial_t\Psi=K\Psi,
+\Delta t,
 \qquad
-K^\dagger=-K,
+a,
+\qquad
+M,
 ```
 
-rather than being treated everywhere as an unconstrained complex state under a generic complex-linear Hamiltonian.
+the Bessel argument
 
-Therefore the old complex Chebyshev implementation must **not** simply be copied into the new simulator. The following must be established explicitly:
+```math
+z=a\Delta t
+```
 
-1. how the Bessel/Chebyshev expansion is represented on the real Majorana state,
-2. whether the recurrence can remain entirely in four-real-component storage,
-3. how the J-complex structure is used, if at all, in the polynomial coefficients,
-4. how the J-anticommuting mass term is handled without storing a charge-conjugate state,
-5. and how norm preservation is verified at finite truncation order.
+is constant.
 
-The project goal is still to obtain large, controlled time steps without Trotterization error, but the exact real-Majorana propagator is now a design problem rather than an assumed solved component.
+The propagation coefficients are therefore also constant:
 
----
+```math
+c_0
+=
+J_0(z),
+```
+
+and
+
+```math
+c_n
+=
+2J_n(z),
+\qquad
+n\ge1.
+```
+
+These coefficients should be calculated once when the simulation configuration is initialized:
+
+```text
+simulation initialization
+        ↓
+choose a
+        ↓
+choose fixed physics_dt
+        ↓
+choose truncation order M
+        ↓
+z = a * physics_dt
+        ↓
+compute
+[c0, c1, ..., cM]
+        ↓
+store coefficients
+```
+
+Every subsequent physics step reuses the same coefficient array:
+
+```text
+physics step 0 ─┐
+physics step 1  │
+physics step 2  ├── same precomputed coefficients
+physics step 3  │
+...             │
+                ┘
+```
+
+The Rust implementation delegates integer-order Bessel-function evaluation to the established `libm` crate rather than implementing its own special-function approximation.
+
+Bessel-function evaluation is therefore simulation-setup work rather than part of the field-sized propagation hot loop.
+
+If the mass-boundary geometry moves while all allowed mass values remain inside a predetermined global bound, the same spectral scale can remain valid and the same Bessel coefficients can continue to be reused.
+
+The coefficients need to be recomputed only when a parameter affecting the expansion changes, such as:
+
+- the numerical physics timestep $\Delta t$,
+- the spectral scale $a$,
+- or the retained order $M$.
+
+Changing only the position or shape of a mass boundary does not by itself require new Bessel coefficients if the existing global spectral bound remains valid.
+
+The eventual GPU implementation should also avoid retaining every Chebyshev basis vector.
+
+The recurrence only requires reusable working fields conceptually similar to
+
+```text
+previous
+current
+next
+accumulator
+```
+
+so the large GPU memory requirement need not grow linearly with the retained Chebyshev order.
 
 # Retained Chebyshev / Bessel-Tail Analysis
 
-The following analysis from the Weyl prototype remains useful whenever the evolution is expressed through a Hermitian operator whose spectrum has been rescaled to $[-1,1]$, or when an equivalent Majorana formulation is proven to inherit the same bound.
+# Chebyshev / Bessel-Tail Error Analysis
+
+The real Majorana Bessel-Chebyshev propagator retains the same Bessel-tail dependence on the dimensionless argument
+
+```math
+z=a\Delta t.
+```
+
+The previously derived Bessel-tail estimates therefore remain useful for selecting a reproducible truncation order $M$.
+
+The actual real Majorana recurrence used by this simulator is documented in the preceding section. The conventional complex-Hermitian formulas below are retained as mathematical derivation/reference material for the corresponding Bessel-tail estimates rather than as the implementation's state representation.
 
 Suppose a Hermitian operator has spectral bounds
 
