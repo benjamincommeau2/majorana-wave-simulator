@@ -1,6 +1,8 @@
-use crate::physics::dirac_generator::direct_dirac_generator_1d; // Reuses the tested complete one-dimensional real Majorana time generator K.
+use crate::physics::dirac_generator::direct_dirac_generator_1d; // Reuses the tested scalar-mass one-dimensional Majorana generator.
 
-pub fn direct_real_chebyshev_basis_1d( // Constructs real Chebyshev basis fields Phi_0 through Phi_max_order for the trusted CPU reference path.
+use crate::physics::dirac_generator::direct_dirac_generator_with_mass_profile_1d; // Reuses the tested spatial-mass Majorana generator for frozen piecewise mass profiles.
+
+pub fn direct_real_chebyshev_basis_1d( // Constructs real Chebyshev basis fields Phi_0 through Phi_max_order for the scalar-mass CPU reference path.
 
   field: &[[f32; 4]],
 
@@ -14,7 +16,7 @@ pub fn direct_real_chebyshev_basis_1d( // Constructs real Chebyshev basis fields
 
 ) -> Vec<Vec<[f32; 4]>> {
 
-  assert!( // Rejects an empty field because the underlying spectral Dirac generator requires a physical lattice.
+  assert!(
 
     !field.is_empty(),
 
@@ -22,7 +24,7 @@ pub fn direct_real_chebyshev_basis_1d( // Constructs real Chebyshev basis fields
 
   );
 
-  assert!( // Requires a positive scaling value because every application of the recurrence divides K by this scale.
+  assert!(
 
     spectral_scale > 0.0,
 
@@ -30,7 +32,7 @@ pub fn direct_real_chebyshev_basis_1d( // Constructs real Chebyshev basis fields
 
   );
 
-  let phi_zero = field.to_vec(); // Defines Phi_0 = Psi exactly as required by the real Chebyshev basis.
+  let phi_zero = field.to_vec();
 
   let mut basis_states = Vec::with_capacity(
 
@@ -50,7 +52,7 @@ pub fn direct_real_chebyshev_basis_1d( // Constructs real Chebyshev basis fields
 
   }
 
-  let generator_phi_zero = direct_dirac_generator_1d( // Computes K Phi_0 using the already-tested real Majorana Dirac generator.
+  let generator_phi_zero = direct_dirac_generator_1d(
 
     &basis_states[0],
 
@@ -66,7 +68,7 @@ pub fn direct_real_chebyshev_basis_1d( // Constructs real Chebyshev basis fields
 
   );
 
-  for generated_state in &generator_phi_zero { // Forms Phi_1 = (K / a) Phi_0 point by point.
+  for generated_state in &generator_phi_zero {
 
     phi_one.push(
 
@@ -92,7 +94,7 @@ pub fn direct_real_chebyshev_basis_1d( // Constructs real Chebyshev basis fields
 
   );
 
-  for order in 1..max_order { // Builds Phi_2 through Phi_max_order using the real Chebyshev recurrence.
+  for order in 1..max_order {
 
     let generator_current = direct_dirac_generator_1d(
 
@@ -120,7 +122,177 @@ pub fn direct_real_chebyshev_basis_1d( // Constructs real Chebyshev basis fields
 
         generator_current[spatial_index];
 
-      let next_state = [ // Applies Phi_(n+1) = 2(K/a)Phi_n + Phi_(n-1).
+      let next_state = [
+
+        2.0 * generated_state[0] / spectral_scale
+
+          + previous_state[0],
+
+        2.0 * generated_state[1] / spectral_scale
+
+          + previous_state[1],
+
+        2.0 * generated_state[2] / spectral_scale
+
+          + previous_state[2],
+
+        2.0 * generated_state[3] / spectral_scale
+
+          + previous_state[3],
+
+      ];
+
+      next_basis_state.push(
+
+        next_state,
+
+      );
+
+    }
+
+    basis_states.push(
+
+      next_basis_state,
+
+    );
+
+  }
+
+  basis_states
+
+}
+
+pub fn direct_real_chebyshev_basis_with_mass_profile_1d( // Constructs the same real Chebyshev basis while using one frozen spatial mass value per lattice site.
+
+  field: &[[f32; 4]],
+
+  lattice_spacing: f32,
+
+  mass_profile: &[f32],
+
+  spectral_scale: f32,
+
+  max_order: usize,
+
+) -> Vec<Vec<[f32; 4]>> {
+
+  assert!(
+
+    !field.is_empty(),
+
+    "Chebyshev basis construction requires at least one lattice point.",
+
+  );
+
+  assert_eq!(
+
+    mass_profile.len(),
+
+    field.len(),
+
+    "Mass profile length must match the Majorana field length.",
+
+  );
+
+  assert!(
+
+    spectral_scale > 0.0,
+
+    "Chebyshev spectral scale must be positive.",
+
+  );
+
+  let phi_zero = field.to_vec(); // Preserves the incoming quantum state exactly as Phi_0.
+
+  let mut basis_states = Vec::with_capacity(
+
+    max_order + 1,
+
+  );
+
+  basis_states.push(
+
+    phi_zero,
+
+  );
+
+  if max_order == 0 {
+
+    return basis_states;
+
+  }
+
+  let generator_phi_zero = direct_dirac_generator_with_mass_profile_1d( // Applies the current frozen mass profile to the original state.
+
+    &basis_states[0],
+
+    lattice_spacing,
+
+    mass_profile,
+
+  );
+
+  let mut phi_one = Vec::with_capacity(
+
+    field.len(),
+
+  );
+
+  for generated_state in &generator_phi_zero { // Forms Phi_1 = K[m(x)] Phi_0 / a.
+
+    phi_one.push(
+
+      [
+
+        generated_state[0] / spectral_scale,
+
+        generated_state[1] / spectral_scale,
+
+        generated_state[2] / spectral_scale,
+
+        generated_state[3] / spectral_scale,
+
+      ],
+
+    );
+
+  }
+
+  basis_states.push(
+
+    phi_one,
+
+  );
+
+  for order in 1..max_order { // Reuses the same frozen mass profile for every generator application during this Chebyshev expansion.
+
+    let generator_current = direct_dirac_generator_with_mass_profile_1d(
+
+      &basis_states[order],
+
+      lattice_spacing,
+
+      mass_profile,
+
+    );
+
+    let mut next_basis_state = Vec::with_capacity(
+
+      field.len(),
+
+    );
+
+    for spatial_index in 0..field.len() {
+
+      let previous_state =
+
+        basis_states[order - 1][spatial_index];
+
+      let generated_state =
+
+        generator_current[spatial_index];
+
+      let next_state = [ // Applies Phi_(n+1) = 2 K[m(x)] Phi_n / a + Phi_(n-1).
 
         2.0 * generated_state[0] / spectral_scale
 
@@ -194,7 +366,7 @@ pub fn precompute_chebyshev_coefficients( // Computes the Bessel weights once fo
 
   );
 
-  let argument = // Computes the fixed dimensionless Bessel argument z = a times delta t.
+  let argument =
 
     spectral_scale
 
@@ -208,7 +380,7 @@ pub fn precompute_chebyshev_coefficients( // Computes the Bessel weights once fo
 
   for order in 0..=max_order {
 
-    let bessel_value = libm::jn( // Delegates the integer-order Bessel J calculation to libm during setup.
+    let bessel_value = libm::jn(
 
       order as i32,
 
@@ -240,7 +412,7 @@ pub fn precompute_chebyshev_coefficients( // Computes the Bessel weights once fo
 
 }
 
-pub fn direct_real_chebyshev_propagate_1d( // Applies the Bessel-weighted real Chebyshev expansion using coefficients that were already computed during simulation setup.
+pub fn direct_real_chebyshev_propagate_1d( // Applies the scalar-mass Bessel-weighted real Chebyshev expansion using coefficients already computed during simulation setup.
 
   field: &[[f32; 4]],
 
@@ -254,7 +426,7 @@ pub fn direct_real_chebyshev_propagate_1d( // Applies the Bessel-weighted real C
 
 ) -> Vec<[f32; 4]> {
 
-  assert!( // Requires at least the zeroth-order coefficient so the expansion always contains Phi_0.
+  assert!(
 
     !coefficients.is_empty(),
 
@@ -262,13 +434,13 @@ pub fn direct_real_chebyshev_propagate_1d( // Applies the Bessel-weighted real C
 
   );
 
-  let max_order = // Infers the requested Chebyshev truncation order directly from the reusable coefficient array.
+  let max_order =
 
     coefficients.len()
 
     - 1;
 
-  let basis_states = direct_real_chebyshev_basis_1d( // Builds the inspectable CPU-reference basis fields required by this coefficient array.
+  let basis_states = direct_real_chebyshev_basis_1d(
 
     field,
 
@@ -282,7 +454,7 @@ pub fn direct_real_chebyshev_propagate_1d( // Applies the Bessel-weighted real C
 
   );
 
-  let mut accumulated_field = vec![ // Uses f64 only for the small scalar weighted accumulation so the CPU oracle loses less precision.
+  let mut accumulated_field = vec![
 
     [0.0_f64; 4];
 
@@ -290,7 +462,7 @@ pub fn direct_real_chebyshev_propagate_1d( // Applies the Bessel-weighted real C
 
   ];
 
-  for order in 0..=max_order { // Adds c_n Phi_n for every retained Chebyshev order.
+  for order in 0..=max_order {
 
     let coefficient =
 
@@ -332,7 +504,7 @@ pub fn direct_real_chebyshev_propagate_1d( // Applies the Bessel-weighted real C
 
   );
 
-  for accumulated_state in accumulated_field { // Converts the high-precision CPU accumulation back to the simulator's four-f32 field representation.
+  for accumulated_state in accumulated_field {
 
     propagated_field.push(
 
