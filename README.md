@@ -863,6 +863,706 @@ This split is central to the proposed implementation:
 
 ---
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Chosen Majorana Tensor Basis and Memory-Stride Convention
+
+The simulator fixes the Majorana/Dirac tensor basis explicitly so that the mathematical tensor-product convention, the four real spinor components, and the physical memory layout cannot silently drift apart.
+
+Throughout this project, the standard computational basis ordering is
+
+```math
+|00\rangle,\quad
+|01\rangle,\quad
+|10\rangle,\quad
+|11\rangle.
+```
+
+With this convention, the **rightmost Kronecker factor is the fast/internal two-state factor**.
+
+The standard Pauli matrices are
+
+```math
+X=
+\begin{pmatrix}
+0&1\\
+1&0
+\end{pmatrix},
+\qquad
+Y=
+\begin{pmatrix}
+0&-i\\
+i&0
+\end{pmatrix},
+\qquad
+Z=
+\begin{pmatrix}
+1&0\\
+0&-1
+\end{pmatrix}.
+```
+
+The chosen Majorana basis is
+
+```math
+\boxed{
+J
+=
+i(I\otimes Y)
+}
+```
+
+together with
+
+```math
+\boxed{
+\begin{aligned}
+\alpha_x &= X\otimes I,\\
+\alpha_y &= Y\otimes Y,\\
+\alpha_z &= Z\otimes I,\\
+\beta    &= Y\otimes Z.
+\end{aligned}
+}
+```
+
+Because
+
+```math
+J=i\gamma^5,
+```
+
+this convention also gives
+
+```math
+\gamma^5=I\otimes Y.
+```
+
+The important point is that this notation is now fixed in **standard Kronecker-product order**. Earlier informal labels such as `IY` or `YI` are not sufficient by themselves because qubit endianness conventions can reverse their intended meaning.
+
+The actual component mapping is therefore treated as the unambiguous definition.
+
+For a real Majorana spinor
+
+```math
+\Psi
+=
+\begin{pmatrix}
+a\\
+b\\
+c\\
+d
+\end{pmatrix},
+```
+
+the real complex structure is
+
+```math
+J
+=
+I\otimes(iY)
+=
+\begin{pmatrix}
+0&1&0&0\\
+-1&0&0&0\\
+0&0&0&1\\
+0&0&-1&0
+\end{pmatrix},
+```
+
+and therefore
+
+```math
+\boxed{
+J(a,b,c,d)
+=
+(b,-a,d,-c).
+}
+```
+
+The four real components naturally separate into two adjacent J-rotation planes:
+
+```text
+[ a, b ] [ c, d ]
+   │        │
+   iY       iY
+```
+
+The first tensor factor is a spectator under $J$, while the second tensor factor contains the active two-dimensional complex structure.
+
+---
+
+## Algebraic Properties of the Chosen Basis
+
+The basis is required to satisfy the Dirac algebra
+
+```math
+\alpha_i^2=I,
+\qquad
+\beta^2=I,
+```
+
+```math
+\{\alpha_i,\alpha_j\}=0
+\qquad
+(i\neq j),
+```
+
+and
+
+```math
+\{\beta,\alpha_i\}=0.
+```
+
+The chosen complex structure satisfies
+
+```math
+\boxed{
+J^2=-I
+}
+```
+
+and
+
+```math
+\boxed{
+J^T=-J.
+}
+```
+
+It also satisfies
+
+```math
+\boxed{
+[J,\alpha_i]=0
+}
+```
+
+for all three kinetic matrices, while
+
+```math
+\boxed{
+\{J,\beta\}=0.
+}
+```
+
+These relations are not merely representation bookkeeping.
+
+They are part of the computational architecture of the simulator.
+
+The kinetic operator is compatible with the J-complex structure, while the mass operator reverses that complex structure.
+
+All of these identities should be enforced by automated tests so that later optimization or component reordering cannot silently change the mathematical representation.
+
+---
+
+## Why J Is Chosen as an Identity Tensor an Active Y Factor
+
+Define the real two-dimensional complex structure
+
+```math
+J_2=iY
+=
+\begin{pmatrix}
+0&1\\
+-1&0
+\end{pmatrix}.
+```
+
+Then
+
+```math
+J
+=
+I\otimes J_2.
+```
+
+Because the first tensor factor is the identity, the J-Fourier rotation factorizes:
+
+```math
+\boxed{
+e^{-J\theta}
+=
+I\otimes e^{-J_2\theta}.
+}
+```
+
+Using
+
+```math
+J_2^2=-I,
+```
+
+the active two-dimensional rotation is
+
+```math
+e^{-J_2\theta}
+=
+I\cos\theta
+-
+J_2\sin\theta.
+```
+
+Therefore the four-component J rotation is not a generic dense four-dimensional matrix operation.
+
+It is two copies of the same two-dimensional rotation:
+
+```text
+spectator channel 0       spectator channel 1
+
+      [a,b]                     [c,d]
+        │                         │
+        └── same J twiddle ───────┘
+        │                         │
+     [a',b']                   [c',d']
+```
+
+This factorization is one of the reasons for choosing a representation with an identity tensor factor in $J$.
+
+A structure in which both tensor factors participated nontrivially in $J$ would lose this clean spectator-factor decomposition.
+
+---
+
+## Packed Complex Interpretation
+
+The same four real numbers can be viewed as two complex storage values without changing the physical number of degrees of freedom.
+
+With the convention
+
+```math
+z_0=a-ib,
+\qquad
+z_1=c-id,
+```
+
+application of $J$ becomes ordinary multiplication by $i$:
+
+```math
+J:
+\quad
+z_0\mapsto iz_0,
+\qquad
+z_1\mapsto iz_1.
+```
+
+For example,
+
+```math
+i(a-ib)
+=
+b+ia,
+```
+
+which corresponds in the real pair representation to
+
+```math
+(a,b)
+\longmapsto
+(b,-a).
+```
+
+Therefore
+
+```math
+e^{-J\theta}
+```
+
+corresponds to
+
+```math
+e^{-i\theta}
+```
+
+on both packed complex channels.
+
+This gives a direct connection between the mathematical J-DFT and a possible conventional complex FFT implementation:
+
+```text
+4 real Majorana components
+        ↓
+two adjacent J planes
+        ↓
+zero-copy packed complex view
+        ↓
+two complex FFT channels
+```
+
+The packed complex interpretation is an implementation view only.
+
+The physical state remains four real Majorana components, and no charge-conjugate copy is introduced.
+
+The sign of the packed complex representation is explicit here:
+
+```math
+z=a-ib.
+```
+
+Using instead $z=a+ib$ would make the same real $J$ correspond to multiplication by $-i$.
+
+This convention must therefore remain explicit when connecting the J-DFT to a conventional FFT backend.
+
+---
+
+## Logical Tensor Shape Versus Physical Memory Stride
+
+The field can be described logically by the axes
+
+```text
+(4 spinor components, Nx, Ny, Nz, scratch-buffer slot)
+```
+
+but this notation describes the **meaning of the dimensions**, not their physical row-major stride order.
+
+The physical memory layout must be stated separately.
+
+The intended hierarchy is
+
+```text
+fastest / closest
+        ↓
+spinor component
+        ↓
+currently active FFT spatial coordinate
+        ↓
+remaining spatial coordinates
+        ↓
+scratch / full-field buffer slot
+        ↓
+slowest / farthest
+```
+
+The four spinor components remain locally adjacent:
+
+```text
+[a, b, c, d]
+```
+
+so one lattice site occupies
+
+```math
+4\times4\text{ bytes}
+=
+16\text{ bytes}.
+```
+
+The active $J_2=iY$ planes are also adjacent:
+
+```text
+[a,b] [c,d]
+```
+
+so the J twiddle does not require gathering components from separate regions of memory.
+
+---
+
+## X-Contiguous Physical Layout
+
+When the $x$ coordinate is the active FFT direction, a C/Rust-style row-major representation can be viewed as
+
+```text
+[scratch][z][y][x][spinor]
+```
+
+where `spinor` is the fastest-changing index.
+
+For spinor component $s$ and scratch-field slot $b$, the flattened scalar offset is
+
+```math
+\boxed{
+\operatorname{offset}_{x}
+=
+s
++
+4\left[
+x
++
+N_x
+\left(
+y
++
+N_y
+\left(
+z
++
+N_z b
+\right)
+\right)
+\right].
+}
+```
+
+The corresponding strides in units of `f32` values are
+
+```math
+\begin{aligned}
+\text{spinor stride} &= 1,\\
+x\text{ stride} &= 4,\\
+y\text{ stride} &= 4N_x,\\
+z\text{ stride} &= 4N_xN_y,\\
+\text{scratch-field stride} &= 4N_xN_yN_z.
+\end{aligned}
+```
+
+In bytes,
+
+```math
+\begin{aligned}
+\text{next spinor component} &= 4\text{ bytes},\\
+\text{next }x\text{ site} &= 16\text{ bytes},\\
+\text{next }y\text{ site} &= 16N_x\text{ bytes},\\
+\text{next }z\text{ site} &= 16N_xN_y\text{ bytes}.
+\end{aligned}
+```
+
+For example, on a $128^3$ lattice,
+
+```math
+\begin{aligned}
+x\text{ neighbor} &= 16\text{ bytes},\\
+y\text{ neighbor} &= 2048\text{ bytes},\\
+z\text{ neighbor} &= 262144\text{ bytes}.
+\end{aligned}
+```
+
+This makes an $x$-direction transform naturally contiguous while direct $y$- and especially $z$-direction transforms would have much larger memory strides.
+
+---
+
+## Spatial Axis Permutation for the 3D J-FFT
+
+The intended 3D FFT strategy should therefore investigate changing the physical spatial ordering between transform directions rather than accepting increasingly strided accesses.
+
+Conceptually:
+
+```text
+X-active layout
+
+[scratch][z][y][x][spinor]
+                    ↑
+               contiguous X
+
+        ↓ tiled permutation / transpose
+
+Y-active layout
+
+[scratch][z][x][y][spinor]
+                    ↑
+               contiguous Y
+
+        ↓ tiled permutation / transpose
+
+Z-active layout
+
+[scratch][y][x][z][spinor]
+                    ↑
+               contiguous Z
+```
+
+The internal four-component ordering does not change during these spatial permutations:
+
+```text
+[a,b,c,d]
+```
+
+and therefore the J-pairs remain
+
+```text
+[a,b] [c,d]
+```
+
+regardless of which spatial coordinate is currently contiguous.
+
+This separates two different levels of memory-stride optimization:
+
+```text
+internal spinor locality
+        ↓
+J-active components are adjacent
+
+spatial FFT locality
+        ↓
+currently transformed X, Y, or Z axis is contiguous
+```
+
+On the CPU this is primarily a cache-locality issue.
+
+On the GPU it is primarily a global-memory access and memory-coalescing issue.
+
+The mathematical motivation is the same: nearby workers should operate on nearby addresses whenever practical.
+
+---
+
+## Scratch Buffers Are Full-Field Storage
+
+Scratch storage should be treated conceptually as an outer collection of complete fields rather than as an extra component inside each lattice site.
+
+For example:
+
+```text
+scratch slot 0
+    ↓
+complete Majorana field
+
+scratch slot 1
+    ↓
+complete Majorana field
+
+scratch slot 2
+    ↓
+complete Majorana field
+```
+
+This is appropriate for FFT work buffers, ping-pong evolution buffers, and Chebyshev recurrence vectors.
+
+Keeping the scratch slot as an outer dimension prevents unrelated working fields from being interleaved inside the 16-byte local spinor representation.
+
+The exact number of persistent scratch fields should be minimized only after the numerical algorithms are fixed.
+
+---
+
+## Why Spatial Stride Is Expected To Matter More Than 4x4 Matrix Arithmetic
+
+The chosen $J$, $\alpha_i$, and $\beta$ matrices are small and highly structured.
+
+The J operation itself is only an adjacent-pair permutation with signs:
+
+```math
+(a,b,c,d)
+\longmapsto
+(b,-a,d,-c).
+```
+
+The spatial FFT, by contrast, operates across every lattice site and performs many whole-field passes.
+
+For a $128^3$ grid,
+
+```math
+128^3
+=
+2,097,152
+```
+
+lattice sites are present.
+
+At 16 bytes per site, one physical field occupies
+
+```math
+2,097,152\times16
+=
+33,554,432\text{ bytes}
+=
+32\text{ MiB}.
+```
+
+A complete read followed by a complete write of that field moves approximately
+
+```math
+32\text{ MiB read}
++
+32\text{ MiB written}
+=
+64\text{ MiB}
+```
+
+before additional FFT stages or scratch buffers are considered.
+
+Therefore avoiding unnecessary full-field transposes, copies, and poorly coalesced transform passes can matter much more than reducing the arithmetic cost of an already-small $4\times4$ spinor operation.
+
+The intended optimization hierarchy is therefore approximately
+
+```text
+correct J / Dirac algebra
+        ↓
+contiguous four-component spinor
+        ↓
+adjacent J rotation planes
+        ↓
+contiguous active FFT coordinate
+        ↓
+efficient X/Y/Z layout permutation
+        ↓
+minimal full-field memory passes
+        ↓
+reuse scratch / ping-pong buffers
+        ↓
+fuse compatible spectral operations where justified
+```
+
+The simulator should also avoid automatically restoring a canonical XYZ memory order after every intermediate operation.
+
+If several consecutive operations can consume the same permuted layout, retaining that layout may avoid an unnecessary whole-field transpose.
+
+---
+
+## What Is Proven and What Must Be Measured
+
+The following facts follow directly from the chosen algebra:
+
+```text
+PROVEN BY ALGEBRA
+
+J = I ⊗ iY
+
+J² = -I
+
+J acts independently on [a,b] and [c,d]
+
+exp(-Jθ) = I ⊗ exp(-(iY)θ)
+
+the spectator tensor factor can be factored out of the J twiddle
+
+the four-real representation can be viewed as two packed
+J-complex channels without adding physical state
+```
+
+The following are deliberate implementation choices:
+
+```text
+DESIGN CHOICES
+
+keep the four spinor components adjacent
+
+keep the J-active pairs adjacent
+
+treat scratch buffers as outer full-field storage
+
+permute X/Y/Z so the active transform axis can remain contiguous
+```
+
+The following must not be claimed as optimal without measurement:
+
+```text
+REQUIRES PROFILING
+
+the best GPU FFT algorithm
+
+the best transpose tile dimensions
+
+the best workgroup size
+
+whether explicit transposes outperform a Stockham-style layout
+
+whether a particular packed-complex implementation is fastest
+
+how many layout permutations should be retained between operators
+
+whether kernel fusion reduces total execution time on the target GPU
+```
+
+The guiding rule is therefore:
+
+> Preserve the mathematically useful $J=I\otimes(iY)$ factorization and design the physical memory layout so that the active J planes and active spatial FFT coordinate are close in memory, but treat the final FFT and transpose strategy as a measurement-driven optimization problem.
+
 # J-DFT
 
 The proposed J-DFT uses the kernel
@@ -1352,7 +2052,7 @@ This is the same raw state memory as the original two-component complex Weyl rep
 
 By contrast, explicitly storing both a two-component complex spinor and a separate conjugate partner would require eight real `f32` values, or 32 bytes/site, before additional work buffers are considered.
 
-The exact component order may be changed to make the J-rotation planes contiguous for FFT packing, but such a change must be benchmarked and documented.
+The component order is fixed so that the two J-rotation planes are the adjacent pairs `[a,b]` and `[c,d]`. Spatial X/Y/Z layout may still be permuted during FFT stages to keep the active transform coordinate contiguous.
 
 Important layout goals are:
 
@@ -2009,8 +2709,6 @@ Several choices remain intentionally unresolved:
 - the physical unit convention,
 - whether variables should be nondimensionalized,
 - spatial boundary conditions,
-- exact Majorana gamma-matrix convention,
-- exact component ordering in GPU memory,
 - J-DFT sign and normalization convention,
 - whether the J-pairs can be used as a zero-copy packed complex FFT view in the final WebGPU FFT backend,
 - FFT implementation strategy in WebGPU,
