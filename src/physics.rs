@@ -10,4 +10,6 @@ pub mod spectral_derivative; // Makes the tested CPU reference spectral derivati
 
 pub mod dirac_generator; // Makes the tested real Majorana Dirac time generator available through the physics module.
 
-pub mod chebyshev_propagator; // Makes the real Bessel-Chebyshev propagation machinery available through the physics module.
+pub mod chebyshev_propagator; // Makes the tested real Bessel-Chebyshev propagation reference available through the physics module.
+
+pub mod mass_profile; // Makes spatial mass-profile construction available through the physics module.

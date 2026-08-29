@@ -86,7 +86,7 @@ pub fn apply_dirac_mass_generator( // Applies the local real Majorana mass time 
 
 }
 
-pub fn direct_dirac_generator_1d( // Applies the complete one-dimensional real Majorana time generator K = -alpha_x partial_x + m(-i beta).
+pub fn direct_dirac_generator_1d( // Applies the complete one-dimensional real Majorana generator for one spatially uniform mass.
 
   field: &[[f32; 4]],
 
@@ -96,7 +96,7 @@ pub fn direct_dirac_generator_1d( // Applies the complete one-dimensional real M
 
 ) -> Vec<[f32; 4]> {
 
-  let kinetic_generator = direct_dirac_kinetic_generator_x_1d( // Computes the spatial contribution -alpha_x partial_x Psi across the whole field.
+  let kinetic_generator = direct_dirac_kinetic_generator_x_1d( // Computes -alpha_x partial_x Psi across the complete field.
 
     field,
 
@@ -104,15 +104,15 @@ pub fn direct_dirac_generator_1d( // Applies the complete one-dimensional real M
 
   );
 
-  let mut complete_generator = Vec::with_capacity( // Allocates exactly one output state for every spatial lattice point.
+  let mut complete_generator = Vec::with_capacity(
 
     field.len(),
 
   );
 
-  for spatial_index in 0..field.len() { // Combines the kinetic and mass contributions point by point.
+  for spatial_index in 0..field.len() {
 
-    let mass_generator = apply_dirac_mass_generator( // Computes the local mass contribution m(-i beta) Psi at this spatial point.
+    let mass_generator = apply_dirac_mass_generator( // Applies the same scalar mass at every lattice point.
 
       &field[spatial_index],
 
@@ -120,7 +120,79 @@ pub fn direct_dirac_generator_1d( // Applies the complete one-dimensional real M
 
     );
 
-    let generated_state = [ // Adds the independently defined kinetic and mass terms to form K Psi.
+    let generated_state = [
+
+      kinetic_generator[spatial_index][0] + mass_generator[0],
+
+      kinetic_generator[spatial_index][1] + mass_generator[1],
+
+      kinetic_generator[spatial_index][2] + mass_generator[2],
+
+      kinetic_generator[spatial_index][3] + mass_generator[3],
+
+    ];
+
+    complete_generator.push(
+
+      generated_state,
+
+    );
+
+  }
+
+  complete_generator
+
+}
+
+pub fn direct_dirac_generator_with_mass_profile_1d( // Applies the complete one-dimensional generator using an independently specified mass at every lattice site.
+
+  field: &[[f32; 4]],
+
+  lattice_spacing: f32,
+
+  mass_profile: &[f32],
+
+) -> Vec<[f32; 4]> {
+
+  assert_eq!( // Requires every physical lattice site to have exactly one corresponding mass value.
+
+    mass_profile.len(),
+
+    field.len(),
+
+    "Mass profile length must match the Majorana field length.",
+
+  );
+
+  let kinetic_generator = direct_dirac_kinetic_generator_x_1d( // Computes the mass-independent kinetic contribution once across the complete field.
+
+    field,
+
+    lattice_spacing,
+
+  );
+
+  let mut complete_generator = Vec::with_capacity(
+
+    field.len(),
+
+  );
+
+  for spatial_index in 0..field.len() { // Combines the shared spectral kinetic term with the local mass value at each lattice site.
+
+    let local_mass =
+
+      mass_profile[spatial_index];
+
+    let mass_generator = apply_dirac_mass_generator( // Computes m(x) B Psi(x) using the mass currently assigned to this particular site.
+
+      &field[spatial_index],
+
+      local_mass,
+
+    );
+
+    let generated_state = [
 
       kinetic_generator[spatial_index][0] + mass_generator[0],
 
