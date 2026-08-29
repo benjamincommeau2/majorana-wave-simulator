@@ -38,13 +38,13 @@ pub fn direct_real_chebyshev_basis_1d( // Constructs real Chebyshev basis fields
 
   );
 
-  basis_states.push( // Stores Phi_0 as the first inspectable CPU reference basis field.
+  basis_states.push(
 
     phi_zero,
 
   );
 
-  if max_order == 0 { // Stops immediately when the caller requests only the zeroth basis state.
+  if max_order == 0 {
 
     return basis_states;
 
@@ -60,7 +60,7 @@ pub fn direct_real_chebyshev_basis_1d( // Constructs real Chebyshev basis fields
 
   );
 
-  let mut phi_one = Vec::with_capacity( // Allocates one scaled generated state for every spatial lattice point.
+  let mut phi_one = Vec::with_capacity(
 
     field.len(),
 
@@ -86,7 +86,7 @@ pub fn direct_real_chebyshev_basis_1d( // Constructs real Chebyshev basis fields
 
   }
 
-  basis_states.push( // Stores Phi_1 as the second inspectable CPU reference basis field.
+  basis_states.push(
 
     phi_one,
 
@@ -94,7 +94,7 @@ pub fn direct_real_chebyshev_basis_1d( // Constructs real Chebyshev basis fields
 
   for order in 1..max_order { // Builds Phi_2 through Phi_max_order using the real Chebyshev recurrence.
 
-    let generator_current = direct_dirac_generator_1d( // Computes K Phi_n for the current basis field.
+    let generator_current = direct_dirac_generator_1d(
 
       &basis_states[order],
 
@@ -104,13 +104,13 @@ pub fn direct_real_chebyshev_basis_1d( // Constructs real Chebyshev basis fields
 
     );
 
-    let mut next_basis_state = Vec::with_capacity( // Allocates storage for Phi_(n+1) across the complete lattice.
+    let mut next_basis_state = Vec::with_capacity(
 
       field.len(),
 
     );
 
-    for spatial_index in 0..field.len() { // Applies Phi_(n+1) = 2(K/a)Phi_n + Phi_(n-1) independently at every spatial point.
+    for spatial_index in 0..field.len() {
 
       let previous_state =
 
@@ -120,7 +120,7 @@ pub fn direct_real_chebyshev_basis_1d( // Constructs real Chebyshev basis fields
 
         generator_current[spatial_index];
 
-      let next_state = [
+      let next_state = [ // Applies Phi_(n+1) = 2(K/a)Phi_n + Phi_(n-1).
 
         2.0 * generated_state[0] / spectral_scale
 
@@ -148,7 +148,7 @@ pub fn direct_real_chebyshev_basis_1d( // Constructs real Chebyshev basis fields
 
     }
 
-    basis_states.push( // Retains this basis field for inspection by the deliberately memory-heavy CPU oracle.
+    basis_states.push(
 
       next_basis_state,
 
@@ -156,6 +156,86 @@ pub fn direct_real_chebyshev_basis_1d( // Constructs real Chebyshev basis fields
 
   }
 
-  basis_states // Returns Phi_0 through Phi_max_order in increasing Chebyshev order.
+  basis_states
+
+}
+
+pub fn precompute_chebyshev_coefficients( // Computes the Bessel weights once for a fixed spectral scale, physics timestep, and truncation order.
+
+  spectral_scale: f64,
+
+  physics_dt: f64,
+
+  max_order: usize,
+
+) -> Vec<f64> {
+
+  assert!( // Requires the spectral scale a to be physically and numerically meaningful.
+
+    spectral_scale > 0.0,
+
+    "Chebyshev spectral scale must be positive.",
+
+  );
+
+  assert!( // Allows the exact t = 0 case while rejecting a negative numerical timestep.
+
+    physics_dt >= 0.0,
+
+    "Chebyshev physics timestep must be nonnegative.",
+
+  );
+
+  assert!( // Prevents an overflowing conversion because libm::jn receives its integer order as i32.
+
+    max_order <= i32::MAX as usize,
+
+    "Chebyshev order exceeds the range supported by libm::jn.",
+
+  );
+
+  let argument = // Computes the fixed dimensionless Bessel argument z = a times delta t.
+
+    spectral_scale
+
+    * physics_dt;
+
+  let mut coefficients = Vec::with_capacity( // Allocates exactly one coefficient for every order from zero through M.
+
+    max_order + 1,
+
+  );
+
+  for order in 0..=max_order {
+
+    let bessel_value = libm::jn( // Delegates the actual integer-order Bessel J calculation to the established math library.
+
+      order as i32,
+
+      argument,
+
+    );
+
+    let coefficient = if order == 0 { // Uses c_0 = J_0(z) without the factor of two.
+
+      bessel_value
+
+    } else { // Uses c_n = 2 J_n(z) for every positive Chebyshev order.
+
+      2.0
+
+        * bessel_value
+
+    };
+
+    coefficients.push(
+
+      coefficient,
+
+    );
+
+  }
+
+  coefficients // Returns the small array that can be stored once and reused for every fixed-timestep propagation step.
 
 }
