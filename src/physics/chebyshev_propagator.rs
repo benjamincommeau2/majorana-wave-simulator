@@ -527,3 +527,119 @@ pub fn direct_real_chebyshev_propagate_1d( // Applies the scalar-mass Bessel-wei
   propagated_field
 
 }
+
+pub fn direct_real_chebyshev_propagate_with_mass_profile_1d( // Applies the Bessel-weighted real Chebyshev expansion using one frozen spatial mass profile.
+
+  field: &[[f32; 4]],
+
+  lattice_spacing: f32,
+
+  mass_profile: &[f32],
+
+  spectral_scale: f32,
+
+  coefficients: &[f64],
+
+) -> Vec<[f32; 4]> {
+
+  assert!(
+
+    !coefficients.is_empty(),
+
+    "Chebyshev propagation requires at least the zeroth-order coefficient.",
+
+  );
+
+  let max_order =
+
+    coefficients.len()
+
+    - 1;
+
+  let basis_states = direct_real_chebyshev_basis_with_mass_profile_1d( // Builds every CPU-reference basis state using the same frozen Hamiltonian for this propagation interval.
+
+    field,
+
+    lattice_spacing,
+
+    mass_profile,
+
+    spectral_scale,
+
+    max_order,
+
+  );
+
+  let mut accumulated_field = vec![
+
+    [0.0_f64; 4];
+
+    field.len()
+
+  ];
+
+  for order in 0..=max_order { // Applies the already-precomputed Bessel coefficient belonging to each Chebyshev basis order.
+
+    let coefficient =
+
+      coefficients[order];
+
+    for spatial_index in 0..field.len() {
+
+      accumulated_field[spatial_index][0] +=
+
+        coefficient
+
+        * basis_states[order][spatial_index][0] as f64;
+
+      accumulated_field[spatial_index][1] +=
+
+        coefficient
+
+        * basis_states[order][spatial_index][1] as f64;
+
+      accumulated_field[spatial_index][2] +=
+
+        coefficient
+
+        * basis_states[order][spatial_index][2] as f64;
+
+      accumulated_field[spatial_index][3] +=
+
+        coefficient
+
+        * basis_states[order][spatial_index][3] as f64;
+
+    }
+
+  }
+
+  let mut propagated_field = Vec::with_capacity(
+
+    field.len(),
+
+  );
+
+  for accumulated_state in accumulated_field {
+
+    propagated_field.push(
+
+      [
+
+        accumulated_state[0] as f32,
+
+        accumulated_state[1] as f32,
+
+        accumulated_state[2] as f32,
+
+        accumulated_state[3] as f32,
+
+      ],
+
+    );
+
+  }
+
+  propagated_field
+
+}
