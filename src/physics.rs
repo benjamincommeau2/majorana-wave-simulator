@@ -13,3 +13,5 @@ pub mod dirac_generator; // Makes the tested real Majorana Dirac time generator 
 pub mod chebyshev_propagator; // Makes the tested real Bessel-Chebyshev propagation reference available through the physics module.
 
 pub mod mass_profile; // Makes spatial mass-profile construction available through the physics module.
+
+pub mod spectral_bound; // Makes conservative spectral-scale bounds available for Chebyshev setup.
