@@ -17,3 +17,5 @@ pub mod chebyshev_truncation; // Makes conservative Bessel-tail truncation calcu
 pub mod mass_profile; // Makes spatial mass-profile construction available through the physics module.
 
 pub mod spectral_bound; // Makes conservative spectral-scale bounds available for Chebyshev setup.
+
+pub mod chebyshev_propagation_setup;
