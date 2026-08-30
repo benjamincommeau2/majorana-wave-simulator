@@ -10,13 +10,15 @@ pub struct GpuScaledDiracGenerator1d {
 
   mass_profile_buffer: wgpu::Buffer,
 
+  _derivative_matrix_buffer: wgpu::Buffer,
+
   _parameter_buffer: wgpu::Buffer,
 
   bind_group_layout: wgpu::BindGroupLayout,
 
   pipeline: wgpu::ComputePipeline,
 
-  point_count: u32,
+  total_point_count: u32,
 
 }
 
@@ -34,11 +36,49 @@ impl GpuScaledDiracGenerator1d {
 
   ) -> Self {
 
+    Self::new_batched_x_lines(
+
+      device,
+
+      point_count,
+
+      1,
+
+      lattice_spacing,
+
+      spectral_scale,
+
+    )
+
+  }
+
+  pub fn new_batched_x_lines(
+
+    device: &wgpu::Device,
+
+    line_length: u32,
+
+    line_count: u32,
+
+    lattice_spacing: f32,
+
+    spectral_scale: f32,
+
+  ) -> Self {
+
     assert!(
 
-      point_count > 0,
+      line_length > 0,
 
-      "GPU scaled Dirac generator requires at least one field point.",
+      "GPU scaled Dirac generator requires at least one point per x-line.",
+
+    );
+
+    assert!(
+
+      line_count > 0,
+
+      "GPU scaled Dirac generator requires at least one x-line.",
 
     );
 
@@ -62,6 +102,20 @@ impl GpuScaledDiracGenerator1d {
 
     );
 
+    let total_point_count = line_length
+
+      .checked_mul(
+
+        line_count,
+
+      )
+
+      .expect(
+
+        "GPU scaled Dirac generator point count overflowed.",
+
+      );
+
     let mass_profile_buffer = device.create_buffer(
 
       &wgpu::BufferDescriptor {
@@ -74,7 +128,7 @@ impl GpuScaledDiracGenerator1d {
 
         size:
 
-          point_count as u64
+          line_length as u64
 
           * std::mem::size_of::<f32>() as u64,
 
@@ -90,11 +144,43 @@ impl GpuScaledDiracGenerator1d {
 
     );
 
-    let parameter_bytes = create_parameter_bytes(
+    let derivative_matrix = create_spectral_derivative_matrix(
 
-      point_count,
+      line_length,
 
       lattice_spacing,
+
+    );
+
+    let derivative_matrix_buffer = device.create_buffer_init(
+
+      &wgpu::util::BufferInitDescriptor {
+
+        label: Some(
+
+          "Scaled Dirac Generator Spectral Derivative Matrix Buffer",
+
+        ),
+
+        contents: bytemuck::cast_slice(
+
+          &derivative_matrix,
+
+        ),
+
+        usage:
+
+          wgpu::BufferUsages::STORAGE,
+
+      },
+
+    );
+
+    let parameter_bytes = create_parameter_bytes(
+
+      line_length,
+
+      total_point_count,
 
       spectral_scale,
 
@@ -220,6 +306,10 @@ impl GpuScaledDiracGenerator1d {
 
       mass_profile_buffer,
 
+      _derivative_matrix_buffer:
+
+        derivative_matrix_buffer,
+
       _parameter_buffer:
 
         parameter_buffer,
@@ -228,7 +318,7 @@ impl GpuScaledDiracGenerator1d {
 
       pipeline,
 
-      point_count,
+      total_point_count,
 
     }
 
@@ -318,6 +408,20 @@ impl GpuScaledDiracGenerator1d {
 
               self
 
+                ._derivative_matrix_buffer
+
+                .as_entire_binding(),
+
+          },
+
+          wgpu::BindGroupEntry {
+
+            binding: 4,
+
+            resource:
+
+              self
+
                 ._parameter_buffer
 
                 .as_entire_binding(),
@@ -376,7 +480,7 @@ impl GpuScaledDiracGenerator1d {
 
     compute_pass.dispatch_workgroups(
 
-      self.point_count.div_ceil(
+      self.total_point_count.div_ceil(
 
         WORKGROUP_SIZE,
 
@@ -392,11 +496,151 @@ impl GpuScaledDiracGenerator1d {
 
 }
 
-fn create_parameter_bytes(
+fn create_spectral_derivative_matrix(
 
-  point_count: u32,
+  line_length: u32,
 
   lattice_spacing: f32,
+
+) -> Vec<f32> {
+
+  let line_length_f64 =
+
+    line_length as f64;
+
+  let lattice_spacing_f64 =
+
+    lattice_spacing as f64;
+
+  let derivative_scale =
+
+    std::f64::consts::PI
+
+    / (
+
+      line_length_f64
+
+      * lattice_spacing_f64
+
+    );
+
+  let mut matrix = Vec::with_capacity(
+
+    line_length as usize
+
+    * line_length as usize,
+
+  );
+
+  for output_x in 0..line_length {
+
+    for source_x in 0..line_length {
+
+      if output_x == source_x {
+
+        matrix.push(
+
+          0.0,
+
+        );
+
+        continue;
+
+      }
+
+      let signed_difference =
+
+        output_x as i64
+
+        - source_x as i64;
+
+      let absolute_difference =
+
+        signed_difference.abs() as u32;
+
+      let even_grid_opposite_point =
+
+        line_length % 2 == 0
+
+        && absolute_difference * 2 == line_length;
+
+      if even_grid_opposite_point {
+
+        matrix.push(
+
+          0.0,
+
+        );
+
+        continue;
+
+      }
+
+      let angle =
+
+        std::f64::consts::PI
+
+        * signed_difference as f64
+
+        / line_length_f64;
+
+      let alternating_sign =
+
+        if absolute_difference % 2 == 0 {
+
+          1.0_f64
+
+        } else {
+
+          -1.0_f64
+
+        };
+
+      let sine =
+
+        angle.sin();
+
+      let coefficient =
+
+        if line_length % 2 == 0 {
+
+          derivative_scale
+
+          * alternating_sign
+
+          * angle.cos()
+
+          / sine
+
+        } else {
+
+          derivative_scale
+
+          * alternating_sign
+
+          / sine
+
+        };
+
+      matrix.push(
+
+        coefficient as f32,
+
+      );
+
+    }
+
+  }
+
+  matrix
+
+}
+
+fn create_parameter_bytes(
+
+  line_length: u32,
+
+  total_point_count: u32,
 
   spectral_scale: f32,
 
@@ -416,13 +660,13 @@ fn create_parameter_bytes(
 
   bytes.extend_from_slice(
 
-    &point_count.to_le_bytes(),
+    &line_length.to_le_bytes(),
 
   );
 
   bytes.extend_from_slice(
 
-    &lattice_spacing.to_le_bytes(),
+    &total_point_count.to_le_bytes(),
 
   );
 
@@ -484,9 +728,17 @@ fn create_bind_group_layout(
 
         ),
 
+        storage_buffer_layout_entry(
+
+          3,
+
+          true,
+
+        ),
+
         wgpu::BindGroupLayoutEntry {
 
-          binding: 3,
+          binding: 4,
 
           visibility:
 

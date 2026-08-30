@@ -55,11 +55,49 @@ impl GpuChebyshevPropagator1d {
 
   ) -> Self {
 
+    Self::new_batched_x_lines(
+
+      device,
+
+      point_count,
+
+      1,
+
+      lattice_spacing,
+
+      setup,
+
+    )
+
+  }
+
+  pub fn new_batched_x_lines(
+
+    device: &wgpu::Device,
+
+    line_length: u32,
+
+    line_count: u32,
+
+    lattice_spacing: f32,
+
+    setup: &ChebyshevPropagationSetup,
+
+  ) -> Self {
+
     assert!(
 
-      point_count > 0,
+      line_length > 0,
 
-      "GPU Chebyshev propagator requires at least one field point.",
+      "GPU Chebyshev propagator requires at least one point per x-line.",
+
+    );
+
+    assert!(
+
+      line_count > 0,
+
+      "GPU Chebyshev propagator requires at least one x-line.",
 
     );
 
@@ -71,9 +109,23 @@ impl GpuChebyshevPropagator1d {
 
     );
 
+    let total_point_count = line_length
+
+      .checked_mul(
+
+        line_count,
+
+      )
+
+      .expect(
+
+        "GPU Chebyshev propagator point count overflowed.",
+
+      );
+
     let field_buffer_size =
 
-      point_count as u64
+      total_point_count as u64
 
       * COMPONENTS_PER_POINT
 
@@ -83,7 +135,7 @@ impl GpuChebyshevPropagator1d {
 
       device,
 
-      point_count,
+      total_point_count,
 
       setup.coefficients(),
 
@@ -91,11 +143,13 @@ impl GpuChebyshevPropagator1d {
 
     recurrence.reset_basis_roles();
 
-    let generator = GpuScaledDiracGenerator1d::new(
+    let generator = GpuScaledDiracGenerator1d::new_batched_x_lines(
 
       device,
 
-      point_count,
+      line_length,
+
+      line_count,
 
       lattice_spacing,
 
@@ -125,7 +179,7 @@ impl GpuChebyshevPropagator1d {
 
     let initialization_parameter_bytes = create_initialization_parameter_bytes(
 
-      point_count,
+      total_point_count,
 
       setup.coefficients(),
 
@@ -341,7 +395,9 @@ impl GpuChebyshevPropagator1d {
 
         initialization_parameter_buffer,
 
-      point_count,
+      point_count:
+
+        total_point_count,
 
       field_buffer_size,
 

@@ -1225,3 +1225,196 @@ fn gpu_scaled_dirac_generator_updates_points_beyond_one_workgroup() {
   );
 
 }
+
+#[test] // Diagnoses the batched 16-point even-grid generator independently of the Chebyshev recurrence.
+
+#[ignore = "requires a native GPU adapter"]
+
+fn gpu_batched_scaled_dirac_generator_matches_cpu_for_sixteen_point_lines() {
+
+  pollster::block_on(
+
+    async {
+
+      let instance =
+        gpu::gpu_context::create_instance();
+
+      let adapter = gpu::gpu_context::request_adapter(
+        &instance,
+      )
+      .await;
+
+      let (
+        device,
+        queue,
+      ) = gpu::gpu_context::request_device_and_queue(
+        &adapter,
+      )
+      .await;
+
+      let line_length =
+        16_usize;
+
+      let line_count =
+        2_usize;
+
+      let total_point_count =
+        line_length
+        * line_count;
+
+      let lattice_spacing =
+        0.5_f32;
+
+      let spectral_scale =
+        6.5_f32;
+
+      let mut field = Vec::with_capacity(
+        total_point_count,
+      );
+
+      for line_index in 0..line_count {
+
+        let line_scale =
+          0.1_f32
+          * (
+            line_index as f32
+            + 1.0
+          );
+
+        for x in 0..line_length {
+
+          let x_value =
+            x as f32
+            + 1.0;
+
+          field.push(
+            [
+              line_scale
+                * x_value,
+              -0.5
+                * line_scale
+                * x_value,
+              0.25
+                * line_scale
+                * x_value,
+              -line_scale
+                * x_value,
+            ],
+          );
+
+        }
+
+      }
+
+      let mass_profile =
+        create_mass_step_profile_1d(
+          line_length,
+          7,
+          -0.75,
+          1.0,
+        );
+
+      let generator =
+        GpuScaledDiracGenerator1d::new_batched_x_lines(
+          &device,
+          line_length as u32,
+          line_count as u32,
+          lattice_spacing,
+          spectral_scale,
+        );
+
+      let input_buffer =
+        create_input_buffer(
+          &device,
+          &field,
+        );
+
+      let output_buffer =
+        create_output_buffer(
+          &device,
+          total_point_count,
+        );
+
+      let binding =
+        generator.create_binding(
+          &device,
+          &input_buffer,
+          &output_buffer,
+        );
+
+      queue.write_buffer(
+        generator.mass_profile_buffer(),
+        0,
+        bytemuck::cast_slice(
+          &mass_profile,
+        ),
+      );
+
+      let mut encoder =
+        gpu::commands::create_command_encoder(
+          &device,
+        );
+
+      generator.record_apply(
+        &mut encoder,
+        &binding,
+      );
+
+      gpu::commands::submit_commands(
+        &queue,
+        encoder,
+      );
+
+      let actual =
+        read_gpu_f32_buffer(
+          &device,
+          &queue,
+          &output_buffer,
+          field_buffer_size(
+            total_point_count,
+          ),
+        );
+
+      let mut expected =
+        Vec::with_capacity(
+          total_point_count
+          * COMPONENTS_PER_POINT,
+        );
+
+      for x_line in field.chunks_exact(
+        line_length,
+      ) {
+
+        expected.extend(
+          scaled_cpu_reference(
+            x_line,
+            lattice_spacing,
+            &mass_profile,
+            spectral_scale,
+          ),
+        );
+
+      }
+
+      for (
+        index,
+        component,
+      ) in actual.iter().enumerate() {
+
+        assert!(
+          component.is_finite(),
+          "GPU batched generator produced a non-finite value at flattened component {index}: {component}",
+        );
+
+      }
+
+      assert_f32_slices_approximately_equal(
+        &actual,
+        &expected,
+      );
+
+    },
+
+  );
+
+}
