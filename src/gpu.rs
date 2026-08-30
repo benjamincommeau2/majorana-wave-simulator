@@ -21,3 +21,5 @@ pub mod development_cube; // Makes the dedicated development-cube animation modu
 pub mod chebyshev_recurrence; // Provides the reusable constant-memory GPU Chebyshev basis recurrence.
 
 pub mod scaled_dirac_generator_1d; // Applies the scaled one-dimensional Majorana Dirac generator on reusable GPU buffers.
+
+pub mod chebyshev_propagator_1d; // Combines the scaled Dirac generator and rolling Chebyshev recurrence into one reusable GPU physics step.

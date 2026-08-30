@@ -319,6 +319,18 @@ impl GpuChebyshevRecurrence {
 
   }
 
+  pub(crate) fn reset_basis_roles(
+
+    &mut self,
+
+  ) {
+
+    self.current_basis_is_a =
+
+      false;
+
+  }
+
   pub fn previous_basis_buffer(
 
     &self,
