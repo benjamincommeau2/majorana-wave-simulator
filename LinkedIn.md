@@ -1,3 +1,88 @@
+# 2026/08/29
+
+https://www.linkedin.com/posts/benjamincommeau_rust-webgpu-webassembly-activity-7499611838024818688-KE34/?utm_source=share&utm_medium=member_desktop&rcm=ACoAACtxJGYB1ue63Kge-Z8YwDkr7dUOCr3VdCs
+
+Majorana WebGPU Simulator: From GPU Infrastructure to a Tested Propagator
+
+Repo:
+ https://lnkd.in/e-wDysjg
+
+Live demo:
+ https://lnkd.in/eJpqeYKB
+
+My last update ended with several major physics pieces still missing. Since then, I’ve built the CPU reference path for much of the simulator’s numerical evolution before moving it to WebGPU.
+
+The current path is:
+
+real 4-component Majorana field
+ → J-DFT
+ → Fourier-pseudospectral derivative
+ → real Dirac generator
+ → spatial mass profile m(x)
+ → real Bessel-Chebyshev propagation
+ → next Majorana state
+
+In 1D, the real generator is
+
+K = -αx ∂x + m(x)(-iβ),
+
+with ∂tΨ = KΨ.
+
+I first implemented a direct O(N²) J-DFT as a deliberately slow CPU oracle. It now verifies forward/inverse reconstruction, positive and negative spectral derivatives, the Nyquist convention, the Majorana/Dirac algebra, and the relativistic identity
+
+K²Ψ = -(k² + m²)Ψ
+
+for uniform-mass Fourier modes.
+
+For time evolution, I derived the real Chebyshev recurrence
+
+Φ₀ = Ψ
+ Φ₁ = (K/a)Ψ
+ Φₙ₊₁ = 2(K/a)Φₙ + Φₙ₋₁
+
+with Bessel coefficients precomputed for a fixed spectral scale, timestep, and truncation order.
+
+The CPU propagator has been checked against the exact single-mode evolution
+
+e^(KΔt)Ψ = cos(EΔt)Ψ + [sin(EΔt)/E]KΨ.
+
+I also implemented the first version of the interaction model I want: movable piecewise mass boundaries.
+
+Ψ₀
+ → propagate with mass profile A
+ → Ψ₁
+ → move boundary
+ → propagate the SAME Ψ₁ with mass profile B
+ → Ψ₂
+
+The wavefunction is not reinitialized when the Hamiltonian changes. Numerically, this is piecewise-static evolution:
+
+Ψₙ₊₁ = e^(KₙΔt)Ψₙ.
+
+I also derived a conservative 1D spectral scale
+
+a = k_max,active + m_max,
+
+so moving a boundary within the allowed mass range does not require recomputing the Bessel coefficients.
+
+One correction from earlier posts: I fixed an ambiguous tensor-order convention and locked the project to
+
+J = I ⊗ (iY),
+
+so J(a,b,c,d) = (b,-a,d,-c).
+
+That correction is now protected by explicit component and algebra tests.
+
+Current verification:
+
+66 portable Rust tests passing
+ native WebGPU integration test passing
+ Rust → WebAssembly / Trunk build passing
+
+The new propagation code is still a CPU reference implementation, not yet GPU-accelerated. The next step is to choose Chebyshev order from the actual spectral scale, timestep, and f32 precision target, then use the CPU path as the oracle for the WebGPU implementation.
+
+hashtag#Rust hashtag#WebGPU hashtag#WebAssembly hashtag#ScientificComputing hashtag#ComputationalPhysics hashtag#NumericalMethods hashtag#QuantumPhysics hashtag#TDD hashtag#OpenSource
+
 # 2026/08/27
 
 https://www.linkedin.com/posts/benjamincommeau_rust-webgpu-webassembly-share-7498797625903661058-PaZ7/?utm_source=share&utm_medium=member_desktop&rcm=ACoAACtxJGYB1ue63Kge-Z8YwDkr7dUOCr3VdCs
