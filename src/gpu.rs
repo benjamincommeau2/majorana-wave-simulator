@@ -19,3 +19,5 @@ pub mod commands; // Makes the GPU command-recording module available as `gpu::c
 pub mod development_cube; // Makes the dedicated development-cube animation module available as `gpu::development_cube`.
 
 pub mod chebyshev_recurrence; // Provides the reusable constant-memory GPU Chebyshev basis recurrence.
+
+pub mod scaled_dirac_generator_1d; // Applies the scaled one-dimensional Majorana Dirac generator on reusable GPU buffers.
