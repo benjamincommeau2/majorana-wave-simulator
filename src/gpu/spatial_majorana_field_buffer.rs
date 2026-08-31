@@ -1,6 +1,6 @@
 // src/gpu/spatial_majorana_field_buffer.rs
 
-pub fn create_spatial_majorana_field_buffer( // Creates the GPU storage buffer that will hold every four-component point of the three-dimensional Majorana field.
+pub fn create_spatial_majorana_field_buffer( // Creates the GPU storage buffer that holds the renderable field and remains the authoritative GPU-resident physics state.
 
   device: &wgpu::Device, // Borrows the existing WebGPU device responsible for creating GPU resources.
 
@@ -16,12 +16,18 @@ pub fn create_spatial_majorana_field_buffer( // Creates the GPU storage buffer t
 
       size, // Allocates exactly enough bytes for every four-component point in the field.
 
-      usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST, // Lets WGSL read the field as storage data and lets Rust upload the initialized field through the queue.
+      usage:
 
-      mapped_at_creation: false, // Leaves the buffer unmapped because Queue::write_buffer will upload the field data.
+        wgpu::BufferUsages::STORAGE
 
-    }, // Finishes the spatial-field buffer description.
+        | wgpu::BufferUsages::COPY_DST
 
-  ) // Returns the completed GPU buffer.
+        | wgpu::BufferUsages::COPY_SRC, // Lets rendering/compute read the field, Rust upload its initial state, and the propagator copy the current state into its reusable Chebyshev basis buffers.
 
-} // Finishes creating the spatial Majorana field buffer.
+      mapped_at_creation: false, // Leaves the buffer unmapped because Queue::write_buffer performs initialization.
+
+    },
+
+  )
+
+}

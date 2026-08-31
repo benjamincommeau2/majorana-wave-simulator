@@ -1,159 +1,355 @@
-#[cfg(any(target_arch = "wasm32", test))] // Compiles mouse rotation for the browser and for native unit tests, but not for unused ordinary native builds.
+#[cfg(any(target_arch = "wasm32", test))]
 
-mod mouse_drag_rotation; // Keeps mouse interaction private while allowing its deterministic behavior to be unit tested.
+mod mouse_drag_rotation;
 
-#[cfg(target_arch = "wasm32")] // Includes one-frame spatial Majorana field rendering only in the browser build.
+#[cfg(target_arch = "wasm32")]
 
-mod render_spatial_majorana_field_frame; // Keeps the GPU commands for drawing one actual spatial-field frame separate from animation setup.
+mod render_spatial_majorana_field_frame;
 
-#[cfg(target_arch = "wasm32")] // Includes browser animation support only when compiling for WebAssembly.
+#[cfg(target_arch = "wasm32")]
 
-use std::cell::RefCell; // Provides interior mutability so the animation callback can store a reference to itself.
+use std::cell::RefCell;
 
-#[cfg(target_arch = "wasm32")] // Includes reference-counting support only in the browser build.
+#[cfg(target_arch = "wasm32")]
 
-use std::rc::Rc; // Lets the requestAnimationFrame callback remain alive across many browser frames.
+use std::rc::Rc;
 
-#[cfg(target_arch = "wasm32")] // Includes the JavaScript callback wrapper only in the browser build.
+#[cfg(target_arch = "wasm32")]
 
-use wasm_bindgen::closure::Closure; // Wraps our Rust animation function so the browser can call it repeatedly.
+use wasm_bindgen::closure::Closure;
 
-#[cfg(target_arch = "wasm32")] // Includes browser type-casting support only in the WebAssembly build.
+#[cfg(target_arch = "wasm32")]
 
-use wasm_bindgen::JsCast; // Lets the Rust Closure be supplied where requestAnimationFrame expects a JavaScript function.
+use wasm_bindgen::JsCast;
 
-#[cfg(target_arch = "wasm32")] // Builds this animation function only for the browser target.
+#[cfg(target_arch = "wasm32")]
 
-pub fn start_mouse_rotation( // Starts the spatial Majorana field renderer whose orientation is controlled by click-and-drag mouse movement.
+pub fn start_mouse_rotation(
 
-  canvas: web_sys::HtmlCanvasElement, // Receives the browser canvas so mouse listeners can control the displayed three-dimensional field.
+  canvas: web_sys::HtmlCanvasElement,
 
-  surface: wgpu::Surface<'static>, // Takes ownership of the configured browser surface used to present rendered field frames.
+  surface: wgpu::Surface<'static>,
 
-  device: wgpu::Device, // Takes ownership of the WebGPU device used to create the field-rendering resources and per-frame commands.
+  device: wgpu::Device,
 
-  queue: wgpu::Queue, // Takes ownership of the queue used to update rotation and submit each field-rendering frame.
+  queue: wgpu::Queue,
 
-  pipeline: wgpu::RenderPipeline, // Takes ownership of the already-created spatial Majorana field rendering pipeline.
+  pipeline: wgpu::RenderPipeline,
 
-  spatial_majorana_field_buffer: wgpu::Buffer, // Takes ownership of the GPU storage buffer containing all 4096 four-component spatial field points.
+  spatial_majorana_field_buffer: wgpu::Buffer,
 
-) { // Starts the spatial-field animation setup.
+) {
 
-  let rotation_buffer = device.create_buffer( // Creates the small GPU buffer whose angle value will change every animation frame.
+  const SIDE_LENGTH: usize = 16;
 
-    &wgpu::BufferDescriptor { // Starts the rotation-buffer description.
+  const LATTICE_SPACING: f32 = 1.0;
 
-      label: Some("Development Cube Rotation Buffer"), // Gives the rotation buffer an explicit debugging name.
+  const MAXIMUM_MASS_MAGNITUDE: f32 = 1.0;
 
-      size: 16, // Allocates sixteen bytes so the uniform has the alignment-friendly size of four f32 values.
+  const LEFT_MASS: f32 = -1.0;
 
-      usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST, // Lets the shader read the buffer as a uniform and lets Rust update it through the queue.
+  const RIGHT_MASS: f32 = 1.0;
 
-      mapped_at_creation: false, // Leaves the buffer unmapped because Queue::write_buffer will update it each frame.
+  const INITIAL_MASS_BOUNDARY_INDEX: usize =
+    SIDE_LENGTH
+    / 2;
 
-    }, // Finishes the rotation-buffer description.
+  const PHYSICS_DT: f64 = 0.01;
 
-  ); // Finishes creating the rotation buffer.
+  const PLAYBACK_RATE: f64 = 1.0;
 
-  let field_bind_group = crate::gpu::bind_groups::create_spatial_majorana_field_render_bind_group( // Connects both rotation and the actual uploaded field data to the spatial rendering shader.
+  const MAX_PHYSICS_STEPS_PER_FRAME: usize = 4;
 
-    &device, // Supplies the WebGPU device that creates the field render bind group.
+  let rotation_buffer = device.create_buffer(
 
-    &pipeline, // Supplies the spatial-field render pipeline whose binding layout comes from WGSL.
+    &wgpu::BufferDescriptor {
 
-    &rotation_buffer, // Supplies binding zero containing the mouse-controlled yaw and pitch.
+      label: Some(
 
-    &spatial_majorana_field_buffer, // Supplies binding one containing all 4096 uploaded Majorana field points.
+        "Development Cube Rotation Buffer",
 
-  ); // Finishes creating the spatial-field rendering bind group.
+      ),
 
-  let drag_state = mouse_drag_rotation::attach_mouse_drag_rotation( // Delegates browser mouse interaction to the explicitly named mouse-drag module.
+      size: 16,
 
-    &canvas, // Supplies the development canvas on which cube dragging is observed.
+      usage:
 
-  ); // Finishes creating the shared mouse-controlled rotation state.
+        wgpu::BufferUsages::UNIFORM
 
-  let mut simulation_clock = crate::simulation_clock::SimulationClock::new( // Creates the persistent scheduler that separates browser render timing from future fixed physics evolution.
+        | wgpu::BufferUsages::COPY_DST,
 
-    0.01, // Temporarily uses a 0.01 simulation-time physics step only to exercise browser scheduling; the final numerical physics timestep will be chosen later.
+      mapped_at_creation: false,
 
-    1.0, // Temporarily requests one simulation-time unit of playback per real-world second.
+    },
 
-    4, // Prevents one delayed browser frame from requesting more than four future physics steps.
+  );
 
-  ); // Finishes creating the persistent frame-independent simulation clock.
+  let field_bind_group = crate::gpu::bind_groups::create_spatial_majorana_field_render_bind_group(
 
-  let animation_callback: Rc<RefCell<Option<Closure<dyn FnMut(f64)>>>> = Rc::new(RefCell::new(None)); // Creates explicitly typed shared storage for the repeating browser animation callback so Rust knows what value the initially empty Option will later contain.
+    &device,
 
-  let animation_callback_for_start = animation_callback.clone(); // Keeps a second reference so we can schedule the first frame after constructing the callback.
+    &pipeline,
 
-  *animation_callback_for_start.borrow_mut() = Some( // Stores the completed callback inside the shared animation-callback container.
+    &rotation_buffer,
 
-    Closure::<dyn FnMut(f64)>::new(move |timestamp_ms: f64| { // Runs once per browser frame and now uses the browser timestamp to schedule physics independently from rendering.
+    &spatial_majorana_field_buffer,
 
-      let _scheduled_physics_steps = simulation_clock.steps_for_frame( // Asks the persistent simulation clock how many fixed physics steps should occur before this rendered frame.
+  );
 
-        timestamp_ms, // Supplies the actual requestAnimationFrame timestamp generated by the browser.
+  let drag_state = mouse_drag_rotation::attach_mouse_drag_rotation(
 
-      ); // Finishes calculating this frame's future physics-step count without evolving the field yet.
+    &canvas,
 
-      let rotation_values = { // Copies the current mouse-controlled orientation into the four-f32 GPU uniform.
+  );
 
-        let state = drag_state.borrow(); // Reads the latest mouse-controlled rotation state.
+  let spectral_scale = crate::physics::spectral_bound::conservative_dirac_spectral_scale_1d(
 
-        let [yaw, pitch] = state.angles(); // Requests only the two angles that the renderer needs from the mouse-interaction module.
+    SIDE_LENGTH,
 
-        [ // Starts the sixteen-byte uniform value sent to WGSL.
+    LATTICE_SPACING,
 
-          yaw, // Sends the horizontal rotation angle to rotation.x.
+    MAXIMUM_MASS_MAGNITUDE,
 
-          pitch, // Sends the vertical rotation angle to rotation.y.
+  );
 
-          0.0, // Leaves the third uniform component unused.
+  let propagation_setup = crate::physics::chebyshev_propagation_setup::ChebyshevPropagationSetup::new(
 
-          0.0, // Leaves the fourth uniform component unused.
+    spectral_scale as f64,
 
-        ] // Finishes the four-component rotation uniform.
+    PHYSICS_DT,
 
-      }; // Finishes copying the mouse-controlled angles.
+  );
 
-      render_spatial_majorana_field_frame::render_spatial_majorana_field_frame( // Renders the actual uploaded Majorana field using the current mouse-controlled orientation.
+  let x_line_count =
 
-        &surface, // Supplies the configured browser surface that receives this field frame.
+    SIDE_LENGTH
 
-        &device, // Supplies the WebGPU device used to record the frame.
+    * SIDE_LENGTH;
 
-        &queue, // Supplies the queue used for rotation updates and rendering submission.
+  let mut physics_propagator = crate::gpu::chebyshev_propagator_1d::GpuChebyshevPropagator1d::new_batched_x_lines(
 
-        &pipeline, // Supplies the spatial Majorana field rendering pipeline.
+    &device,
 
-        &rotation_buffer, // Supplies the yaw-and-pitch uniform buffer.
+    SIDE_LENGTH as u32,
 
-        &field_bind_group, // Supplies both the rotation uniform and complete uploaded field storage buffer.
+    x_line_count as u32,
 
-        &rotation_values, // Supplies the current mouse-controlled yaw and pitch.
+    LATTICE_SPACING,
 
-      ); // Finishes rendering this spatial Majorana field frame.
+    &propagation_setup,
 
-      let window = web_sys::window().expect("Could not get browser window for cube animation"); // Gets the browser Window needed to request the next frame.
+  );
 
-      window.request_animation_frame( // Asks the browser to call this same Rust callback again for the next display frame.
+  let mass_profile = crate::physics::mass_profile::create_mass_step_profile_1d(
 
-        animation_callback.borrow().as_ref().expect("Cube animation callback disappeared").as_ref().unchecked_ref(), // Passes the stored Rust callback back to the browser as a JavaScript-compatible function.
+    SIDE_LENGTH,
 
-      ).expect("Could not request the next cube animation frame"); // Stops clearly if the next animation callback cannot be scheduled.
+    INITIAL_MASS_BOUNDARY_INDEX,
 
-    }), // Finishes constructing the repeating animation callback.
+    LEFT_MASS,
 
-  ); // Finishes storing the animation callback.
+    RIGHT_MASS,
 
-  let window = web_sys::window().expect("Could not get browser window to start cube animation"); // Gets the browser Window used to schedule the first animation frame.
+  );
 
-  window.request_animation_frame( // Requests the first frame, after which the callback will continue requesting later frames itself.
+  queue.write_buffer(
 
-    animation_callback_for_start.borrow().as_ref().expect("Cube animation callback was not created").as_ref().unchecked_ref(), // Supplies the newly created Rust animation callback to the browser.
+    physics_propagator.mass_profile_buffer(),
 
-  ).expect("Could not start cube animation"); // Stops clearly if the first animation frame cannot be scheduled.
+    0,
 
-} // Finishes the development-cube rotation setup.
+    bytemuck::cast_slice(
+
+      &mass_profile,
+
+    ),
+
+  );
+
+  let mut simulation_clock = crate::simulation_clock::SimulationClock::new(
+
+    PHYSICS_DT,
+
+    PLAYBACK_RATE,
+
+    MAX_PHYSICS_STEPS_PER_FRAME,
+
+  );
+
+  let animation_callback: Rc<RefCell<Option<Closure<dyn FnMut(f64)>>>> = Rc::new(
+
+    RefCell::new(
+
+      None,
+
+    ),
+
+  );
+
+  let animation_callback_for_start =
+
+    animation_callback.clone();
+
+  *animation_callback_for_start.borrow_mut() = Some(
+
+    Closure::<dyn FnMut(f64)>::new(
+
+      move |timestamp_ms: f64| {
+
+        let scheduled_physics_steps = simulation_clock.steps_for_frame(
+
+          timestamp_ms,
+
+        );
+
+        if scheduled_physics_steps > 0 {
+
+          let mut physics_encoder = crate::gpu::commands::create_command_encoder(
+
+            &device,
+
+          );
+
+          for _ in 0..scheduled_physics_steps {
+
+            physics_propagator.record_step(
+
+              &mut physics_encoder,
+
+              &spatial_majorana_field_buffer,
+
+            );
+
+          }
+
+          crate::gpu::commands::submit_commands(
+
+            &queue,
+
+            physics_encoder,
+
+          );
+
+        }
+
+        let rotation_values = {
+
+          let state =
+
+            drag_state.borrow();
+
+          let [
+
+            yaw,
+
+            pitch,
+
+          ] = state.angles();
+
+          [
+
+            yaw,
+
+            pitch,
+
+            0.0,
+
+            0.0,
+
+          ]
+
+        };
+
+        render_spatial_majorana_field_frame::render_spatial_majorana_field_frame(
+
+          &surface,
+
+          &device,
+
+          &queue,
+
+          &pipeline,
+
+          &rotation_buffer,
+
+          &field_bind_group,
+
+          &rotation_values,
+
+        );
+
+        let window = web_sys::window()
+
+          .expect(
+
+            "Could not get browser window for cube animation",
+
+          );
+
+        window.request_animation_frame(
+
+          animation_callback
+
+            .borrow()
+
+            .as_ref()
+
+            .expect(
+
+              "Cube animation callback disappeared",
+
+            )
+
+            .as_ref()
+
+            .unchecked_ref(),
+
+        )
+
+        .expect(
+
+          "Could not request the next cube animation frame",
+
+        );
+
+      },
+
+    ),
+
+  );
+
+  let window = web_sys::window()
+
+    .expect(
+
+      "Could not get browser window to start cube animation",
+
+    );
+
+  window.request_animation_frame(
+
+    animation_callback_for_start
+
+      .borrow()
+
+      .as_ref()
+
+      .expect(
+
+        "Cube animation callback was not created",
+
+      )
+
+      .as_ref()
+
+      .unchecked_ref(),
+
+  )
+
+  .expect(
+
+    "Could not start cube animation",
+
+  );
+
+}
