@@ -1,5 +1,67 @@
 # 2026/08/29
 
+https://www.linkedin.com/posts/benjamincommeau_rust-webgpu-webassembly-ugcPost-7500324935261868032-hA7W/?utm_source=share&utm_medium=member_desktop&rcm=ACoAACtxJGYB1ue63Kge-Z8YwDkr7dUOCr3VdCs
+
+Majorana WebGPU Simulator: The Propagator Is Now Running Live on the GPU
+
+Repo:
+https://github.com/benjamincommeau2/majorana-wave-simulator
+
+Live demo:
+https://benjamincommeau2.github.io/majorana-wave-simulator/
+
+My last update ended with a CPU reference implementation of the Majorana/Dirac propagator. That numerical path is now running on WebGPU and driving the browser visualization in real time.
+
+The current path is:
+
+4-real-component Majorana field
+→ spatial mass profile m(x)
+→ scaled Dirac generator K/a
+→ rolling Bessel-Chebyshev recurrence
+→ next Majorana field
+→ WebGPU rendering
+
+For the 1D physics currently implemented,
+
+K = -αx ∂x + m(x)(-iβ),
+
+with ∂tΨ = KΨ.
+
+The GPU recurrence uses a constant number of field-sized working buffers rather than storing every Chebyshev basis state.
+
+Connecting the verified 1D physics to the existing 16×16×16 visualization exposed an important architecture issue: flattening all 4096 points into one spectral line would incorrectly couple the end of one x-row to the start of the next.
+
+Instead, the GPU treats the volume as 256 independent x-lines × 16 points and applies the same 1D spectral evolution to each fixed (y,z) line in parallel.
+
+I added integration tests verifying that:
+
+→ the full 16³ GPU result matches the CPU line-by-line oracle
+→ neighboring x-lines do not couple
+→ complete GPU timesteps match the CPU propagator
+→ changing the mass profile preserves the already-evolved state
+
+While testing the 16-point even grid, I also isolated a GPU NaN to the spectral derivative kernel. I replaced repeated shader-side trigonometric coefficient calculations with a derivative matrix precomputed once during setup. For the current grid that matrix is only 16×16, leaving the GPU hot path as coefficient loads and multiply-adds.
+
+The browser now uses the same 4096-point GPU buffer for physics and rendering:
+
+requestAnimationFrame
+→ fixed-step SimulationClock
+→ record N GPU physics steps
+→ submit
+→ render the evolved field
+
+No CPU readback is required in the simulation loop.
+
+The live demo now visibly evolves continuously while remaining interactively rotatable.
+
+The current model is intentionally still 1D physics embedded in a 3D visualization: each (y,z) x-line evolves independently. I am not calling it a full 3D Dirac solver yet.
+
+Next: runtime performance diagnostics, then an interactive movable mass boundary.
+
+#Rust #WebGPU #WebAssembly #GPUComputing #ScientificComputing #ComputationalPhysics #NumericalMethods #OpenSource
+
+# 2026/08/29
+
 https://www.linkedin.com/posts/benjamincommeau_rust-webgpu-webassembly-activity-7499611838024818688-KE34/?utm_source=share&utm_medium=member_desktop&rcm=ACoAACtxJGYB1ue63Kge-Z8YwDkr7dUOCr3VdCs
 
 Majorana WebGPU Simulator: From GPU Infrastructure to a Tested Propagator

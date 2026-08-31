@@ -40,6 +40,15 @@ web-sys = { version = "0.3", features = [ # Gives Rust access only to the browse
   "MouseEvent", # Enables Rust to read mouse-button and mouse-position information while the user drags the cube.
 
   "Window", # Enables Rust access to the browser window and animation-frame scheduling.
+
+    "Blob",
+  "BlobEvent",
+  "HtmlElement",
+  "MediaRecorder",
+  "MediaRecorderOptions",
+  "MediaStream",
+  "Url",
+  
 ] } # Finishes the selected web-sys browser features.
 
 wgpu = "30.0" # Adds wgpu, the Rust graphics library that can use browser WebGPU when compiled to WebAssembly.

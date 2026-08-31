@@ -14,6 +14,10 @@ pub mod physics; // Makes the CPU-side physics modules available through the cra
 
 pub mod spatial_majorana_field; // Makes the three-dimensional Majorana field representation available to the simulator and its tests.
 
+#[cfg(target_arch = "wasm32")]
+
+mod browser_canvas_recorder;
+
 mod browser_startup; // Includes the browser and WebAssembly startup module in the compiled application.
 
 pub mod simulation_clock; // Exposes the pure simulation clock used to schedule fixed physics steps independently from rendering.

@@ -135,6 +135,20 @@ pub fn start() -> Result<(), JsValue> { // Defines the startup function and says
 
     #[cfg(target_arch = "wasm32")] // Starts the visual development-cube animation only in the browser WebAssembly build.
 
+    crate::browser_canvas_recorder::attach_canvas_recorder(
+
+      &_render_canvas,
+
+    )
+
+    .expect(
+
+      "Could not attach the LinkedIn canvas recorder",
+
+    );
+
+      #[cfg(target_arch = "wasm32")]
+      
       gpu::development_cube::start_mouse_rotation( // Starts the development cube with click-hold-drag rotation instead of automatic spinning.
 
       _render_canvas, // Gives the interaction module ownership of the browser canvas so it can listen for mouse dragging.
