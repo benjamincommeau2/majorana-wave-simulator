@@ -12,12 +12,18 @@ pub mod gpu; // Makes the WebGPU modules available through the crate's public AP
 
 pub mod physics; // Makes the CPU-side physics modules available through the crate's public API.
 
-pub mod spatial_majorana_field; // Makes the three-dimensional Majorana field representation available to the simulator and its tests.
+pub mod spatial_majorana_field;
+
+pub mod runtime_diagnostics;
 
 #[cfg(target_arch = "wasm32")]
 
 mod browser_canvas_recorder;
 
-mod browser_startup; // Includes the browser and WebAssembly startup module in the compiled application.
+#[cfg(target_arch = "wasm32")]
 
-pub mod simulation_clock; // Exposes the pure simulation clock used to schedule fixed physics steps independently from rendering.
+mod runtime_diagnostics_overlay;
+
+mod browser_startup;
+
+pub mod simulation_clock;

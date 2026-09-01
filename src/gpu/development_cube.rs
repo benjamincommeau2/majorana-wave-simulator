@@ -60,6 +60,9 @@ pub fn start_mouse_rotation(
 
   const MAX_PHYSICS_STEPS_PER_FRAME: usize = 4;
 
+  const DIAGNOSTICS_UPDATE_INTERVAL_MS: f64 =
+    250.0;
+
   let rotation_buffer = device.create_buffer(
 
     &wgpu::BufferDescriptor {
@@ -120,6 +123,9 @@ pub fn start_mouse_rotation(
 
   );
 
+  let chebyshev_order =
+    propagation_setup.max_order();
+
   let x_line_count =
 
     SIDE_LENGTH
@@ -176,6 +182,39 @@ pub fn start_mouse_rotation(
 
   );
 
+  let mut runtime_diagnostics =
+    crate::runtime_diagnostics::RuntimeDiagnostics::new(
+
+      PHYSICS_DT,
+
+      DIAGNOSTICS_UPDATE_INTERVAL_MS,
+
+    );
+
+
+  let diagnostics_overlay =
+    crate::runtime_diagnostics_overlay::RuntimeDiagnosticsOverlay::new(
+
+      PHYSICS_DT,
+
+      chebyshev_order,
+
+      spectral_scale as f64,
+
+      SIDE_LENGTH,
+
+      x_line_count,
+
+      SIDE_LENGTH,
+
+    )
+
+    .expect(
+
+      "Could not create runtime diagnostics overlay",
+
+    );
+
   let animation_callback: Rc<RefCell<Option<Closure<dyn FnMut(f64)>>>> = Rc::new(
 
     RefCell::new(
@@ -196,21 +235,25 @@ pub fn start_mouse_rotation(
 
       move |timestamp_ms: f64| {
 
-        let scheduled_physics_steps = simulation_clock.steps_for_frame(
+        let physics_schedule =
+          simulation_clock.schedule_for_frame(
 
-          timestamp_ms,
-
-        );
-
-        if scheduled_physics_steps > 0 {
-
-          let mut physics_encoder = crate::gpu::commands::create_command_encoder(
-
-            &device,
+            timestamp_ms,
 
           );
 
-          for _ in 0..scheduled_physics_steps {
+
+        if physics_schedule.steps_to_run > 0 {
+
+          let mut physics_encoder =
+            crate::gpu::commands::create_command_encoder(
+
+              &device,
+
+            );
+
+
+          for _ in 0..physics_schedule.steps_to_run {
 
             physics_propagator.record_step(
 
@@ -222,11 +265,33 @@ pub fn start_mouse_rotation(
 
           }
 
+
           crate::gpu::commands::submit_commands(
 
             &queue,
 
             physics_encoder,
+
+          );
+
+        }
+
+
+        if let Some(snapshot) =
+          runtime_diagnostics.record_frame(
+
+            timestamp_ms,
+
+            physics_schedule.steps_to_run,
+
+            physics_schedule.dropped_steps,
+
+          )
+        {
+
+          diagnostics_overlay.update(
+
+            &snapshot,
 
           );
 
