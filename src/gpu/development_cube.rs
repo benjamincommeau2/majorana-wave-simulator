@@ -172,6 +172,25 @@ pub fn start_mouse_rotation(
 
   );
 
+  let mass_boundary_control =
+    crate::mass_boundary_control::MassBoundaryControl::new(
+
+      SIDE_LENGTH,
+
+      INITIAL_MASS_BOUNDARY_INDEX,
+
+    )
+
+    .expect(
+
+      "Could not create interactive mass-boundary control",
+
+    );
+
+
+  let mut active_mass_boundary_index =
+    INITIAL_MASS_BOUNDARY_INDEX;
+
   let mut simulation_clock = crate::simulation_clock::SimulationClock::new(
 
     PHYSICS_DT,
@@ -234,6 +253,48 @@ pub fn start_mouse_rotation(
     Closure::<dyn FnMut(f64)>::new(
 
       move |timestamp_ms: f64| {
+
+        let requested_mass_boundary_index =
+          mass_boundary_control.boundary_index();
+
+
+        if requested_mass_boundary_index
+          != active_mass_boundary_index
+        {
+
+          let updated_mass_profile =
+            crate::physics::mass_profile::create_mass_step_profile_1d(
+
+              SIDE_LENGTH,
+
+              requested_mass_boundary_index,
+
+              LEFT_MASS,
+
+              RIGHT_MASS,
+
+            );
+
+
+          queue.write_buffer(
+
+            physics_propagator.mass_profile_buffer(),
+
+            0,
+
+            bytemuck::cast_slice(
+
+              &updated_mass_profile,
+
+            ),
+
+          );
+
+
+          active_mass_boundary_index =
+            requested_mass_boundary_index;
+
+        }
 
         let physics_schedule =
           simulation_clock.schedule_for_frame(

@@ -27,3 +27,7 @@ mod runtime_diagnostics_overlay;
 mod browser_startup;
 
 pub mod simulation_clock;
+
+#[cfg(target_arch = "wasm32")]
+
+mod mass_boundary_control;

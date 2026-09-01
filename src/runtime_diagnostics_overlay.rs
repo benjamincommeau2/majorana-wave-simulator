@@ -68,17 +68,21 @@ impl RuntimeDiagnosticsOverlay {
       )?;
 
 
-    let body = document.body()
+    let controls = document.get_element_by_id(
 
-      .ok_or_else(
+      "simulator-controls",
 
-        || JsValue::from_str(
+    )
 
-          "Could not get document body for runtime diagnostics.",
+    .ok_or_else(
 
-        ),
+      || JsValue::from_str(
 
-      )?;
+        "Could not find simulator-controls for runtime diagnostics.",
+
+      ),
+
+    )?;
 
 
     let element = document.create_element(
@@ -94,19 +98,11 @@ impl RuntimeDiagnosticsOverlay {
 
       concat!(
 
-        "position: fixed;",
-
-        "top: 12px;",
-
-        "left: 12px;",
-
-        "z-index: 1000;",
-
         "margin: 0;",
 
         "padding: 10px 12px;",
 
-        "background: rgba(255, 255, 255, 0.90);",
+        "background: #f4f4f4;",
 
         "border: 1px solid #888;",
 
@@ -129,7 +125,7 @@ impl RuntimeDiagnosticsOverlay {
     )?;
 
 
-    body.append_child(
+    controls.append_child(
 
       &element,
 

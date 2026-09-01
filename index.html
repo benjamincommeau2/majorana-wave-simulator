@@ -4,36 +4,53 @@ This file is the browser entry point for the Majorana Wave Simulator.
 Its responsibilities include:
 - Defining the basic webpage structure.
 - Providing HTML elements that Rust can access and update.
-- Telling Trunk to compile and load the Rust/WebAssembly application.
+- Telling Trunk to compile and load the Rust WebAssembly application.
 - Acting as the browser shell around the Rust/WebGPU simulator.
 
 The simulation logic itself belongs in Rust rather than in this HTML file.
 -->
 
-<!doctype html> <!-- Tells the browser that this file uses modern HTML5. -->
+<!doctype html>
 
-<html lang="en"> <!-- Starts the HTML document and tells the browser that the page language is English. -->
-  
-  <head> <!-- Starts the head section, which stores page information that is not part of the main visible content. -->
-    
-    <meta charset="UTF-8"> <!-- Tells the browser to use UTF-8 text encoding so letters, symbols, and special characters display correctly. -->
-    
-    <title>Majorana Wave Simulator</title> <!-- Sets the text shown on the browser tab for this page. -->
-    
-    <link data-trunk rel="rust"> <!-- Tells Trunk to build and connect our Rust WebAssembly code to this webpage. -->
-  
-  </head> <!-- Closes the head section of the HTML document. -->
-  
-  <body> <!-- Starts the visible part of the webpage that the user can see in the browser. -->
-  
-    <h1>Majorana WebGPU Wave Simulator</h1> <!-- Displays the main visible heading at the top of the webpage. -->
-  
-    <pre id="status">Starting Rust...</pre> <!-- Creates a visible status area that Rust will later find by id="status" and replace with a success message. -->
+<html lang="en">
 
-    <p>Click and drag to rotate the spatial Majorana field.</p> <!-- Explains that click-and-drag rotation now controls the rendered spatial Majorana field. -->
+  <head>
 
-    <canvas id="render-canvas" width="640" height="640" aria-label="WebGPU rendering test canvas" style="border: 1px solid black;"></canvas> <!-- Uses a square rendering area so equal horizontal and vertical clip-space distances appear with the same visual scale. -->
-  
-  </body> <!-- Closes the visible body section of the webpage. -->
+    <meta charset="UTF-8">
 
-</html> <!-- Closes the entire HTML document. -->
+    <title>Majorana Wave Simulator</title>
+
+    <link data-trunk rel="rust">
+
+  </head>
+
+  <body>
+
+    <h1>Majorana WebGPU Wave Simulator</h1>
+
+    <pre id="status">Starting Rust...</pre>
+
+    <p>Click and drag to rotate the spatial Majorana field.</p>
+
+    <div
+      id="simulator-controls"
+      style="
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: flex-start;
+        margin: 12px 0;
+      "
+    ></div>
+
+    <canvas
+      id="render-canvas"
+      width="640"
+      height="640"
+      aria-label="WebGPU Majorana field visualization"
+      style="border: 1px solid black;"
+    ></canvas>
+
+  </body>
+
+</html>
