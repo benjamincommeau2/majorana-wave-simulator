@@ -1,3 +1,70 @@
+# 2026/09/02
+
+https://www.linkedin.com/posts/benjamincommeau_rust-webgpu-webassembly-share-7500973932817080320-8uTE/?utm_source=share&utm_medium=member_desktop&rcm=ACoAACtxJGYB1ue63Kge-Z8YwDkr7dUOCr3VdCs
+
+Majorana WebGPU Simulator: Improving the Browser Interface Around the Physics
+ 
+Repo:
+ https://lnkd.in/e-wDysjg
+ 
+Live demo:
+ https://lnkd.in/eJpqeYKB
+ 
+My last update focused on getting the Majorana/Dirac Chebyshev propagator running live on WebGPU.
+ 
+Since then, I’ve been improving the browser interface around the simulation so it is easier to interact with, inspect, and troubleshoot.
+ 
+The simulator now includes an interactive mass-boundary control.
+ 
+The current 1D physics uses a piecewise mass profile
+ 
+m(x) = -1 on one side of the boundary
+ m(x) = +1 on the other.
+ 
+Moving the slider updates that spatial mass profile on the GPU without reinitializing the wavefunction.
+ 
+The existing state continues evolving under the newly selected Hamiltonian:
+ 
+Ψₙ
+ → change m(x)
+ → propagate the same Ψₙ
+ → Ψₙ₊₁
+ 
+I also added live runtime diagnostics showing:
+ 
+→ FPS
+ → frame time
+ → physics steps executed per frame
+ → dropped catch-up steps
+ → accumulated simulation time
+ → fixed physics timestep
+ → Chebyshev order
+ → spectral scale
+ → grid dimensions
+ → batched x-line configuration
+ 
+This makes it easier to distinguish visual smoothness from whether the fixed-step simulation is actually keeping up with the requested physics rate.
+ 
+I also encountered the first real compatibility report from another machine: the user's browser could load the Rust/WASM application but did not expose a compatible WebGPU adapter.
+ 
+Previously that resulted in a blank canvas and a Rust panic.
+ 
+The simulator now handles that case explicitly.
+ 
+If WebGPU is unavailable, the page displays a compatibility message explaining that the application requires a WebGPU-capable browser with hardware acceleration enabled, instead of attempting to start the GPU simulation.
+ 
+I added a deterministic development switch for testing that failure path without changing my own browser or GPU settings:
+ 
+?simulate_webgpu_unavailable=1
+ 
+That lets me verify both the normal WebGPU startup path and the unsupported-environment UI on the same machine.
+ 
+The numerical model is still intentionally 1D physics embedded in a 16×16×16 visualization. My next focus is making that physics easier to interpret visually — especially the location of the mass interface and reflection/transmission behavior.
+ 
+AI-assisted drafting. I reviewed the technical content and wording before publishing.
+ 
+hashtag#Rust hashtag#WebGPU hashtag#WebAssembly hashtag#GPUComputing hashtag#ScientificComputing hashtag#ComputationalPhysics hashtag#NumericalMethods hashtag#OpenSource
+
 # 2026/08/29
 
 https://www.linkedin.com/posts/benjamincommeau_rust-webgpu-webassembly-ugcPost-7500324935261868032-hA7W/?utm_source=share&utm_medium=member_desktop&rcm=ACoAACtxJGYB1ue63Kge-Z8YwDkr7dUOCr3VdCs
