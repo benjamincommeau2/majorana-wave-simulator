@@ -16,6 +16,8 @@ pub mod spatial_majorana_field;
 
 pub mod runtime_diagnostics;
 
+pub mod webgpu_compatibility;
+
 #[cfg(target_arch = "wasm32")]
 
 mod browser_canvas_recorder;
@@ -31,3 +33,4 @@ pub mod simulation_clock;
 #[cfg(target_arch = "wasm32")]
 
 mod mass_boundary_control;
+

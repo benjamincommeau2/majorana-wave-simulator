@@ -25,13 +25,54 @@ pub fn start() -> Result<(), JsValue> { // Defines the startup function and says
   
   let status = document.get_element_by_id("status").expect("Could not find element with id=status"); // Finds the HTML element whose id is "status" and stops if that element does not exist.
 
-  status.set_text_content(Some("Rust/WASM loaded successfully.")); // Replaces the text inside the HTML status element with a success message.
+  status.set_text_content(
+
+    Some(
+
+      "Rust/WASM loaded. Checking WebGPU support...",
+
+    ),
+
+  );
 
   let canvas = document.get_element_by_id("render-canvas").expect("Could not find element with id=render-canvas"); // Finds the dedicated browser canvas that future WebGPU rendering will target.
 
   let _render_canvas = canvas.dyn_into::<web_sys::HtmlCanvasElement>().expect("Could not convert render-canvas into an HtmlCanvasElement"); // Converts the generic browser element into the specific HTML canvas type required by WebGPU while allowing native tests to treat the browser-only handle as intentionally unused.
 
+  let query_string = window
+
+    .location()
+
+    .search()
+
+    .unwrap_or_default();
+
+
+  let simulate_webgpu_unavailable =
+    crate::webgpu_compatibility::should_simulate_webgpu_unavailable(
+
+      &query_string,
+
+    );
+
   spawn_local(async move { // Starts an asynchronous Rust task where our WebGPU initialization will run.
+
+    if simulate_webgpu_unavailable {
+
+      show_webgpu_unavailable(
+
+        &status,
+
+        &_render_canvas,
+
+        true,
+
+      );
+
+
+      return;
+
+    }
 
     let instance = gpu::gpu_context::create_instance(); // Creates the shared WebGPU instance that will later also own the rendering-surface creation step.
 
@@ -43,11 +84,101 @@ pub fn start() -> Result<(), JsValue> { // Defines the startup function and says
 
     ).expect("Could not create WebGPU surface from render-canvas"); // Stops with a clear error if the browser canvas cannot become a WebGPU rendering surface.
 
-    let adapter = gpu::gpu_context::request_adapter(&instance).await; // Requests the same WebGPU adapter as before while keeping the instance available for the future rendering surface.
+    let adapter =
 
-    status.set_text_content(Some("WebGPU adapter acquired successfully.")); // Changes the webpage status only after Rust successfully receives a compatible GPU adapter.
+      match gpu::gpu_context::try_request_adapter(
 
-    let (device, queue) = gpu::gpu_context::request_device_and_queue(&adapter).await; // Delegates WebGPU device and queue creation to the explicitly named GPU context module.
+        &instance,
+
+      )
+
+      .await
+
+      {
+
+        Ok(adapter) => {
+
+          adapter
+
+        }
+
+
+        Err(_error) => {
+
+          show_webgpu_unavailable(
+
+            &status,
+
+            &_render_canvas,
+
+            false,
+
+          );
+
+
+          return;
+
+        }
+
+      };
+
+
+    status.set_text_content(
+
+      Some(
+
+        "WebGPU adapter acquired successfully.",
+
+      ),
+
+    );
+
+    let (
+
+      device,
+
+      queue,
+
+    ) =
+
+      match gpu::gpu_context::try_request_device_and_queue(
+
+        &adapter,
+
+      )
+
+      .await
+
+      {
+
+        Ok(device_and_queue) => {
+
+          device_and_queue
+
+        }
+
+
+        Err(error) => {
+
+          let error_message = error.to_string();
+
+
+          show_webgpu_device_failure(
+
+            &status,
+
+            &_render_canvas,
+
+            &error_message,
+
+          );
+
+
+          return;
+
+        }
+
+      };
 
     let spatial_majorana_field = crate::spatial_majorana_field::SpatialMajoranaField::new_centered_gaussian( // Creates the actual three-dimensional Majorana field that will be uploaded to WebGPU.
 
@@ -170,3 +301,199 @@ pub fn start() -> Result<(), JsValue> { // Defines the startup function and says
   Ok(()) // Tells Rust that the outer start function finished successfully.
 
 } // Closes the outer start function.
+
+fn show_webgpu_unavailable(
+
+  status: &web_sys::Element,
+
+  canvas: &web_sys::HtmlCanvasElement,
+
+  simulated_failure: bool,
+
+) {
+
+  let simulated_notice =
+
+    if simulated_failure {
+
+      "\n\nDevelopment test: simulated WebGPU failure."
+
+    } else {
+
+      ""
+
+    };
+
+
+  let message = format!(
+
+    concat!(
+
+      "WebGPU unavailable\n\n",
+
+      "This simulator requires WebGPU hardware acceleration ",
+
+      "for its GPU physics and rendering.\n\n",
+
+      "Your browser did not provide a compatible WebGPU adapter.\n\n",
+
+      "Try:\n",
+
+      "- Enable hardware acceleration in your browser\n",
+
+      "- Restart the browser after changing that setting\n",
+
+      "- Update to a current WebGPU-capable browser\n",
+
+      "- Check your browser's GPU/WebGPU support\n\n",
+
+      "Your GPU hardware may still be compatible even if the ",
+
+      "current browser configuration does not expose WebGPU.",
+
+      "{}",
+
+    ),
+
+    simulated_notice,
+
+  );
+
+
+  status.set_text_content(
+
+    Some(
+
+      &message,
+
+    ),
+
+  );
+
+
+  let _ = canvas.set_attribute(
+
+    "hidden",
+
+    "",
+
+  );
+
+
+  hide_simulator_interface();
+
+}
+
+
+fn show_webgpu_device_failure(
+
+  status: &web_sys::Element,
+
+  canvas: &web_sys::HtmlCanvasElement,
+
+  error: &str,
+
+) {
+
+  let message = format!(
+
+    concat!(
+
+      "WebGPU device creation failed\n\n",
+
+      "A WebGPU adapter was found, but the simulator could not ",
+
+      "create the GPU device required for physics and rendering.\n\n",
+
+      "Try enabling browser hardware acceleration, updating your ",
+
+      "browser and graphics drivers, then restarting the browser.\n\n",
+
+      "Technical detail: {}",
+
+    ),
+
+    error,
+
+  );
+
+
+  status.set_text_content(
+
+    Some(
+
+      &message,
+
+    ),
+
+  );
+
+
+  let _ = canvas.set_attribute(
+
+    "hidden",
+
+    "",
+
+  );
+
+
+  hide_simulator_interface();
+
+}
+
+
+fn hide_simulator_interface() {
+
+  let Some(window) = web_sys::window()
+
+  else {
+
+    return;
+
+  };
+
+
+  let Some(document) = window.document()
+
+  else {
+
+    return;
+
+  };
+
+
+  if let Some(controls) = document.get_element_by_id(
+
+    "simulator-controls",
+
+  ) {
+
+    let _ = controls.set_attribute(
+
+      "hidden",
+
+      "",
+
+    );
+
+  }
+
+
+  if let Some(instructions) = document.get_element_by_id(
+
+    "interaction-instructions",
+
+  ) {
+
+    let _ = instructions.set_attribute(
+
+      "hidden",
+
+      "",
+
+    );
+
+  }
+
+}

@@ -40,7 +40,7 @@ web-sys = { version = "0.3", features = [ # Gives Rust access only to the browse
   "MouseEvent", # Enables Rust to read mouse-button and mouse-position information while the user drags the cube.
 
   "Window", # Enables Rust access to the browser window and animation-frame scheduling.
-
+"Location",
     "Blob",
   "BlobEvent",
   "HtmlElement",
@@ -49,6 +49,7 @@ web-sys = { version = "0.3", features = [ # Gives Rust access only to the browse
   "MediaStream",
   "Url",
   "HtmlInputElement",
+  
   
 ] } # Finishes the selected web-sys browser features.
 
